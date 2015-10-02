@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/stratspt.cc
 // Implementation of strategy classes for normal forms
@@ -21,18 +21,19 @@
 //
 
 #include "libgambit.h"
+#include "gametable.h"
 
 namespace Gambit {
 
 //===========================================================================
-//                          class StrategySupport
+//                          class StrategySupportProfile
 //===========================================================================
 
 //---------------------------------------------------------------------------
 //                               Lifecycle
 //---------------------------------------------------------------------------
 
-StrategySupport::StrategySupport(const Game &p_nfg) 
+StrategySupportProfile::StrategySupportProfile(const Game &p_nfg)
   : m_nfg(p_nfg), m_profileIndex(p_nfg->MixedProfileLength())
 { 
   for (int pl = 1, index = 1; pl <= p_nfg->NumPlayers(); pl++) {
@@ -49,7 +50,7 @@ StrategySupport::StrategySupport(const Game &p_nfg)
 //                          General information
 //---------------------------------------------------------------------------
 
-Array<int> StrategySupport::NumStrategies(void) const
+Array<int> StrategySupportProfile::NumStrategies(void) const
 {
   Array<int> a(m_support.Length());
 
@@ -59,7 +60,7 @@ Array<int> StrategySupport::NumStrategies(void) const
   return a;
 }
 
-int StrategySupport::MixedProfileLength(void) const
+int StrategySupportProfile::MixedProfileLength(void) const
 {
   int total = 0;
   for (int pl = 1; pl <= m_nfg->NumPlayers();
@@ -68,19 +69,19 @@ int StrategySupport::MixedProfileLength(void) const
 }
 
 template<>
-MixedStrategyProfile<double> StrategySupport::NewMixedStrategyProfile(void) const
+MixedStrategyProfile<double> StrategySupportProfile::NewMixedStrategyProfile(void) const
 {
   return m_nfg->NewMixedStrategyProfile(0.0, *this);
 
 }
 
 template<>
-MixedStrategyProfile<Rational> StrategySupport::NewMixedStrategyProfile(void) const
+MixedStrategyProfile<Rational> StrategySupportProfile::NewMixedStrategyProfile(void) const
 {
   return m_nfg->NewMixedStrategyProfile(Rational(0), *this);
 }
 
-bool StrategySupport::IsSubsetOf(const StrategySupport &p_support) const
+bool StrategySupportProfile::IsSubsetOf(const StrategySupportProfile &p_support) const
 {
   if (m_nfg != p_support.m_nfg)  return false;
   for (int pl = 1; pl <= m_support.Length(); pl++) {
@@ -98,11 +99,65 @@ bool StrategySupport::IsSubsetOf(const StrategySupport &p_support) const
   return true;
 }
 
+
+namespace {
+
+std::string EscapeQuotes(const std::string &s)
+{
+  std::string ret;
+  
+  for (unsigned int i = 0; i < s.length(); i++)  {
+    if (s[i] == '"')   ret += '\\';
+    ret += s[i];
+  }
+
+  return ret;
+}
+
+}  // end anonymous namespace
+
+
+void StrategySupportProfile::WriteNfgFile(std::ostream &p_file) const
+{ 
+  p_file << "NFG 1 R";
+  p_file << " \"" << EscapeQuotes(m_nfg->GetTitle()) << "\" { ";
+
+  for (int i = 1; i <= m_nfg->NumPlayers(); i++)
+    p_file << '"' << EscapeQuotes(m_nfg->GetPlayer(i)->GetLabel()) << "\" ";
+
+  p_file << "}\n\n{ ";
+  
+  for (int i = 1; i <= m_nfg->NumPlayers(); i++)   {
+    p_file << "{ ";
+    for (int j = 1; j <= NumStrategies(i); j++)
+      p_file << '"' << EscapeQuotes(GetStrategy(i, j)->GetLabel()) << "\" ";
+    p_file << "}\n";
+  }
+  
+  p_file << "}\n";
+
+  p_file << "\"" << EscapeQuotes(m_nfg->GetComment()) << "\"\n\n";
+
+  // For trees, we write the payoff version, since there need not be
+  // a one-to-one correspondence between outcomes and entries, when there
+  // are chance moves.
+  StrategyProfileIterator iter(*this);
+    
+  for (; !iter.AtEnd(); iter++) {
+    for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++) {
+      p_file << (*iter)->GetPayoff(pl) << " ";
+    }
+    p_file << "\n";
+  }
+
+  p_file << '\n';
+}
+
 //---------------------------------------------------------------------------
 //                        Modifying the support
 //---------------------------------------------------------------------------
 
-void StrategySupport::AddStrategy(const GameStrategy &p_strategy)
+void StrategySupportProfile::AddStrategy(const GameStrategy &p_strategy)
 { 
   // Get the null-pointer checking out of the way once and for all
   GameStrategyRep *strategy = p_strategy;
@@ -138,7 +193,7 @@ void StrategySupport::AddStrategy(const GameStrategy &p_strategy)
   support.Append(strategy);
 }
 
-bool StrategySupport::RemoveStrategy(const GameStrategy &p_strategy) 
+bool StrategySupportProfile::RemoveStrategy(const GameStrategy &p_strategy)
 { 
   GameStrategyRep *strategy = p_strategy;
   Array<GameStrategy> &support = m_support[strategy->GetPlayer()->GetNumber()];
@@ -166,13 +221,13 @@ bool StrategySupport::RemoveStrategy(const GameStrategy &p_strategy)
 //                 Identification of dominated strategies
 //---------------------------------------------------------------------------
 
-bool StrategySupport::Dominates(const GameStrategy &s, 
+bool StrategySupportProfile::Dominates(const GameStrategy &s,
 				const GameStrategy &t, 
 				bool p_strict) const
 {
   bool equal = true;
   
-  for (StrategyIterator iter(*this); !iter.AtEnd(); iter++) {
+  for (StrategyProfileIterator iter(*this); !iter.AtEnd(); iter++) {
     Rational ap = (*iter)->GetStrategyValue(s);
     Rational bp = (*iter)->GetStrategyValue(t);
     if (p_strict && ap <= bp) {
@@ -188,7 +243,7 @@ bool StrategySupport::Dominates(const GameStrategy &s,
 }
 
 
-bool StrategySupport::IsDominated(const GameStrategy &s, 
+bool StrategySupportProfile::IsDominated(const GameStrategy &s,
 				  bool p_strict,
 				  bool p_external) const
 {
@@ -214,7 +269,7 @@ bool StrategySupport::IsDominated(const GameStrategy &s,
   }
 }
 
-bool StrategySupport::Undominated(StrategySupport &newS, int p_player, 
+bool StrategySupportProfile::Undominated(StrategySupportProfile &newS, int p_player,
 				  bool p_strict, bool p_external) const
 {
   Array<GameStrategy> set((p_external) ? 
@@ -281,10 +336,10 @@ bool StrategySupport::Undominated(StrategySupport &newS, int p_player,
   }
 }
 
-StrategySupport StrategySupport::Undominated(bool p_strict,
+StrategySupportProfile StrategySupportProfile::Undominated(bool p_strict,
 					     bool p_external) const
 {
-  StrategySupport newS(*this);
+  StrategySupportProfile newS(*this);
 
   for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++)   {
     Undominated(newS, pl, p_strict, p_external);
@@ -293,10 +348,10 @@ StrategySupport StrategySupport::Undominated(bool p_strict,
   return newS;
 }
 
-StrategySupport 
-StrategySupport::Undominated(bool p_strict, const Array<int> &players) const
+StrategySupportProfile
+StrategySupportProfile::Undominated(bool p_strict, const Array<int> &players) const
 {
-  StrategySupport newS(*this);
+  StrategySupportProfile newS(*this);
   
   for (int i = 1; i <= players.Length(); i++)   {
     //tracefile << "Dominated strategies for player " << pl << ":\n";
@@ -310,11 +365,11 @@ StrategySupport::Undominated(bool p_strict, const Array<int> &players) const
 //                Identification of overwhelmed strategies
 //---------------------------------------------------------------------------
 
-bool StrategySupport::Overwhelms(const GameStrategy &s, 
-				 const GameStrategy &t, 
-				 bool p_strict) const
+bool StrategySupportProfile::Overwhelms(const GameStrategy &s,
+					const GameStrategy &t, 
+					bool p_strict) const
 {
-  StrategyIterator iter(*this);
+  StrategyProfileIterator iter(*this);
   Rational sMin = (*iter)->GetStrategyValue(s);
   Rational tMax = (*iter)->GetStrategyValue(t);
 
@@ -333,6 +388,60 @@ bool StrategySupport::Overwhelms(const GameStrategy &s,
   }
 
   return true;
+}
+
+Game StrategySupportProfile::Restrict(void) const
+{
+  std::ostringstream os;
+  WriteNfgFile(os);
+  std::istringstream is(os.str());
+  Game restricted = ReadGame(is);
+  for (int pl = 1; pl <= restricted->NumPlayers(); pl++) {
+    GamePlayerRep *player = restricted->Players()[pl];
+    player->m_unrestricted = m_nfg->Players()[pl];
+    for (int st = 1; st <= player->NumStrategies(); st++) {
+      GameStrategyRep *strategy = player->m_strategies[st];
+      strategy->m_unrestricted = m_nfg->Players()[pl]->Strategies()[st];
+    }
+  }
+  dynamic_cast<GameTableRep &>(*restricted).m_unrestricted = m_nfg;
+  return restricted;
+}
+
+
+//===========================================================================
+//                     class StrategySupportProfile::iterator
+//===========================================================================
+
+
+bool StrategySupportProfile::iterator::GoToNext(void)
+{
+  if (strat != support.NumStrategies(pl))  {
+    strat++; 
+    return true; 
+  }
+  else if (pl != support.GetGame()->NumPlayers()) { 
+    pl++; 
+    strat = 1; 
+    return true; 
+  }
+  else {
+    return false;
+  }
+}
+
+bool 
+StrategySupportProfile::iterator::IsSubsequentTo(const GameStrategy &s) const
+{
+  if (pl > s->GetPlayer()->GetNumber())
+    return true; 
+  else if (pl < s->GetPlayer()->GetNumber())
+    return false;
+  else
+    if (strat > s->GetNumber())
+      return true;
+    else
+      return false;
 }
 
 

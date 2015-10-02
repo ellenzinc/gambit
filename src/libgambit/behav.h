@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/behav.h
 // Behavior strategy profile classes
@@ -28,12 +28,12 @@
 namespace Gambit {
 
 ///
-/// MixedBehavProfile<T> implements a randomized behavior profile on
+/// MixedBehaviorProfile<T> implements a randomized behavior profile on
 /// an extensive game.
 ///
-template <class T> class MixedBehavProfile : public DVector<T>  {
+template <class T> class MixedBehaviorProfile : public DVector<T>  {
 protected:
-  BehavSupport m_support;
+  BehaviorSupportProfile m_support;
 
   mutable bool m_cacheValid;
 
@@ -76,30 +76,39 @@ protected:
 public:
   /// @name Lifecycle
   //@{
-  MixedBehavProfile(const Game &);
-  MixedBehavProfile(const BehavSupport &);
-  MixedBehavProfile(const MixedBehavProfile<T> &);
-  MixedBehavProfile(const MixedStrategyProfile<T> &);
-  ~MixedBehavProfile() { }
+  MixedBehaviorProfile(const Game &);
+  MixedBehaviorProfile(const BehaviorSupportProfile &);
+  MixedBehaviorProfile(const MixedBehaviorProfile<T> &);
+  MixedBehaviorProfile(const MixedStrategyProfile<T> &);
+  ~MixedBehaviorProfile() { }
 
-  MixedBehavProfile<T> &operator=(const MixedBehavProfile<T> &);
-  MixedBehavProfile<T> &operator=(const Vector<T> &p)
+  MixedBehaviorProfile<T> &operator=(const MixedBehaviorProfile<T> &);
+  MixedBehaviorProfile<T> &operator=(const Vector<T> &p)
     { Invalidate(); Vector<T>::operator=(p); return *this;}
-  MixedBehavProfile<T> &operator=(const T &x)  
+  MixedBehaviorProfile<T> &operator=(const T &x)  
     { Invalidate(); DVector<T>::operator=(x); return *this; }
 
   //@}
   
   /// @name Operator overloading
   //@{
-  bool operator==(const MixedBehavProfile<T> &) const;
-  bool operator!=(const MixedBehavProfile<T> &x) const 
+  bool operator==(const MixedBehaviorProfile<T> &) const;
+  bool operator!=(const MixedBehaviorProfile<T> &x) const 
   { return !(*this == x); }
 
   bool operator==(const DVector<T> &x) const
   { return DVector<T>::operator==(x); }
   bool operator!=(const DVector<T> &x) const
   { return DVector<T>::operator!=(x); }
+
+  const T &operator[](const GameAction &p_action) const
+    { return (*this)(p_action->GetInfoset()->GetPlayer()->GetNumber(),
+		     p_action->GetInfoset()->GetNumber(),
+		     m_support.GetIndex(p_action)); }
+  T &operator[](const GameAction &p_action)
+    { return (*this)(p_action->GetInfoset()->GetPlayer()->GetNumber(),
+		     p_action->GetInfoset()->GetNumber(),
+		     m_support.GetIndex(p_action)); }
 
   const T &operator()(const GameAction &p_action) const
     { return (*this)(p_action->GetInfoset()->GetPlayer()->GetNumber(),
@@ -119,13 +128,13 @@ public:
   T &operator[](int a)
     { Invalidate();  return Array<T>::operator[](a); }
 
-  MixedBehavProfile<T> &operator+=(const MixedBehavProfile<T> &x)
+  MixedBehaviorProfile<T> &operator+=(const MixedBehaviorProfile<T> &x)
     { Invalidate();  DVector<T>::operator+=(x);  return *this; }
-  MixedBehavProfile<T> &operator+=(const DVector<T> &x)
+  MixedBehaviorProfile<T> &operator+=(const DVector<T> &x)
     { Invalidate();  DVector<T>::operator+=(x);  return *this; }
-  MixedBehavProfile<T> &operator-=(const MixedBehavProfile<T> &x)
+  MixedBehaviorProfile<T> &operator-=(const MixedBehaviorProfile<T> &x)
     { Invalidate();  DVector<T>::operator-=(x);  return *this; }
-  MixedBehavProfile<T> &operator*=(const T &x)
+  MixedBehaviorProfile<T> &operator*=(const T &x)
     { Invalidate();  DVector<T>::operator*=(x);  return *this; }
   //@}
 
@@ -134,14 +143,23 @@ public:
   /// Force recomputation of stored quantities
   void Invalidate(void) const { m_cacheValid = false; }
   /// Set the profile to the centroid
-  void Centroid(void);
+  void SetCentroid(void);
+  /// Set the behavior at any undefined information set to the centroid
+  void UndefinedToCentroid(void);
+  /// Normalize each information set's action probabilities to sum to one
+  void Normalize(void);
+  /// Generate a random behavior strategy profile according to the uniform distribution
+  void Randomize(void);
+  /// Generate a random behavior strategy profile according to the uniform distribution
+  /// on a grid with spacing p_denom
+  void Randomize(int p_denom);
   //@}
 
   /// @name General data access
   //@{
   int Length(void) const { return Array<T>::Length(); }
   Game GetGame(void) const { return m_support.GetGame(); }
-  const BehavSupport &GetSupport(void) const { return m_support; }
+  const BehaviorSupportProfile &GetSupport(void) const { return m_support; }
   
   bool IsDefinedAt(GameInfoset p_infoset) const;
   //@}

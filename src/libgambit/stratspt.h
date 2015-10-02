@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/stratspt.h
 // Interface to strategy classes for normal forms
@@ -27,38 +27,7 @@
 
 namespace Gambit {
 
-/// A forward iterator on a strategy support 
-class SupportStrategyIterator {
-private:
-  const Array<GameStrategy> &m_support;
-  int m_index;
-
-public:
-  /// @name Lifecycle
-  //@{
-  /// Constructor
-  SupportStrategyIterator(const Array<GameStrategy> &p_support)
-    : m_support(p_support), m_index(1) { }
-  //@}
-
-  /// @name Iteration and data access
-  //@{
-  /// Advance to the next element (prefix version)
-  void operator++(void) { m_index++; }
-  /// Advance to the next element (postfix version)
-  void operator++(int) { m_index++; }
-  /// Has iterator gone past the end?
-  bool AtEnd(void) const { return m_index > m_support.Length(); }
-  /// Get the current index into the array
-  int GetIndex(void) const { return m_index; }
-
-  /// Get the current element
-  const GameStrategy &operator*(void) const { return m_support[m_index]; }
-  /// Get the current element
-  const GameStrategy &operator->(void) const { return m_support[m_index]; }
-  /// Get the current element
-  operator const GameStrategy &(void) const { return m_support[m_index]; }
-};
+class StrategySupportProfile;
 
 /// \brief A support on a strategic game
 ///
@@ -71,10 +40,11 @@ public:
 ///
 /// Within the support, strategies are maintained in the same order
 /// in which they appear in the underlying game.
-class StrategySupport {
+class StrategySupportProfile {
   template <class T> friend class MixedStrategyProfile;
   template <class T> friend class MixedStrategyProfileRep;
   template <class T> friend class AggMixedStrategyProfileRep;
+  template <class T> friend class BagentMixedStrategyProfileRep;
 protected:
   Game m_nfg;
   Array<Array<GameStrategy> > m_support;
@@ -82,23 +52,23 @@ protected:
   /// The index into a strategy profile for a strategy (-1 if not in support)
   Array<int> m_profileIndex;
   
-  bool Undominated(StrategySupport &newS, int p_player, 
+  bool Undominated(StrategySupportProfile &newS, int p_player, 
 		   bool p_strict, bool p_external = false) const;
 
 public:
   /// @name Lifecycle
   //@{
   /// Constructor.  By default, a support contains all strategies.
-  StrategySupport(const Game &);
+  StrategySupportProfile(const Game &);
   //@}
 
   /// @name Operator overloading
   //@{
   /// Test for the equality of two supports (same strategies for all players)
-  bool operator==(const StrategySupport &p_support) const
+  bool operator==(const StrategySupportProfile &p_support) const
     { return (m_support == p_support.m_support); }
   /// Test for the inequality of two supports
-  bool operator!=(const StrategySupport &p_support) const
+  bool operator!=(const StrategySupportProfile &p_support) const
     { return (m_support != p_support.m_support); }
   //@}
 
@@ -122,10 +92,10 @@ public:
   GameStrategy GetStrategy(int pl, int st) const 
     { return m_support[pl][st]; }
 
-  /// Returns an iterator over the players in the game
-  GamePlayerIterator Players(void) const  { return m_nfg->Players(); }
-  /// Returns an iterator over the strategies for the player
-  SupportStrategyIterator Strategies(const GamePlayer &p_player) const
+  /// Returns the number of players in the game
+  int NumPlayers(void) const { return m_nfg->NumPlayers(); }
+  /// Returns the set of strategies in the support for a player
+  const Array<GameStrategy> &Strategies(const GamePlayer &p_player) const
     { return m_support[p_player->GetNumber()]; }
 
   /// Returns the index of the strategy in the support.
@@ -137,8 +107,13 @@ public:
     { return m_profileIndex[s->GetId()] >= 0; }
 
   /// Returns true iff this support is a (weak) subset of the specified support
-  bool IsSubsetOf(const StrategySupport &) const;
+  bool IsSubsetOf(const StrategySupportProfile &) const;
 
+  //@}
+
+  /// @name Writing data files
+  //@{
+  void WriteNfgFile(std::ostream &p_file) const;
   //@}
 
   /// @name Modifying the support
@@ -163,17 +138,68 @@ public:
 		   bool p_external = false) const; 
 
   /// Returns a copy of the support with dominated strategies eliminated
-  StrategySupport Undominated(bool p_strict, bool p_external = false) const;
-  StrategySupport Undominated(bool strong, const Array<int> &players) const;
+  StrategySupportProfile Undominated(bool p_strict, bool p_external = false) const;
+  StrategySupportProfile Undominated(bool strong, const Array<int> &players) const;
   //@}
 
   /// @name Identification of overwhelmed strategies
-  //@(
+  //@{
   bool Overwhelms(const GameStrategy &s, const GameStrategy &t, 
                   bool p_strict) const;
   //@}
-};
 
+  Game Restrict(void) const;
+
+
+  class iterator {
+  public:
+    /// @name Lifecycle
+    //@{
+    iterator(const StrategySupportProfile &S, int p_pl = 1, int p_st = 1) : 
+      support(S), pl(p_pl), strat(p_st) { }
+    ~iterator() { }
+    //@}
+
+    /// @name Operator overloading
+    //@{
+    bool operator==(const iterator &other) const
+    { return (support == other.support && pl == other.pl && strat == other.strat); }
+    bool operator!=(const iterator &other) const { return !(*this == other); }
+    //@}
+
+    /// @name Manipulation
+    //@{
+    /// Advance to next strategy; return False when advancing past last strategy.
+    bool GoToNext(void);
+    /// Advance to next strategy
+    void operator++(void) { GoToNext(); }
+    //@}
+
+    /// @name Access to state information
+    //@{
+    GameStrategy GetStrategy(void) const
+    { return support.GetStrategy(pl, strat); }
+    int StrategyIndex(void) const { return strat; }
+    GamePlayer GetPlayer(void) const
+    { return support.GetGame()->GetPlayer(pl); }
+    int PlayerIndex(void) const { return pl; }
+
+    bool IsLast(void) const
+    { return (pl == support.GetGame()->NumPlayers() &&
+	      strat == support.NumStrategies(pl));
+    }
+    bool IsSubsequentTo(const GameStrategy &) const;
+    //@}
+
+  private:
+    const StrategySupportProfile &support;
+    int pl, strat;
+  };
+
+  iterator begin(void) const { return iterator(*this); }
+  iterator end(void) const   { return iterator(*this, m_nfg->NumPlayers() + 1); }
+};
+  
 } // end namespace Gambit
 
 #endif // LIBGAMBIT_STRATSPT_H

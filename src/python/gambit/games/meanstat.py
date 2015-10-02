@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/games/meanstat.py
 # Custom implementation of mean-statistic games
@@ -154,8 +154,8 @@ class MeanStatisticGame(object):
     def __setitem__(self, key, value):
         raise NotImplementedError
 
-    def mixed_profile(self, point=None):
-        return MixedProfile(self, point)
+    def mixed_strategy_profile(self, point=None):
+        return MixedStrategyProfile(self, point)
 
     def to_table(self):
         g = gambit.new_table([ len(self.choices) ] * self.N)
@@ -170,14 +170,13 @@ class MeanStatisticGame(object):
         return g
 
 
-class MixedProfile(object):
-    """
-    A (symmetric) mixed strategy profile on a mean statistic game
+class MixedStrategyProfile(object):
+    """A (symmetric) mixed strategy profile on a mean statistic game.
     """
     def __init__(self, game, profile=None):
         self.game = game
         if profile is None:
-            self.profile = [ 1.0 / len(game.choices) for i in game.choices ]
+            self.set_centroid()
         else:
             self.profile = profile[:]
     
@@ -191,7 +190,7 @@ class MixedProfile(object):
                 ", ".join([ str(self[i]) for i in xrange(len(self)) ]))
 
     def __rmul__(self, fac):
-        p = self.game.mixed_profile()
+        p = self.game.mixed_strategy_profile()
         for i in xrange(len(self)):
             p[i] = fac * self[i]
         return p
@@ -199,11 +198,19 @@ class MixedProfile(object):
     def __add__(self, other):
         if not hasattr(other, "game") or other.game != self.game:
             raise ValueError, "adding a non-MixedProfile to a MixedProfile"
-        p = self.game.mixed_profile()
+        p = self.game.mixed_strategy_profile()
         for i in xrange(len(self)):
             p[i] = self[i] + other[i]
         return p
-    
+
+    def set_centroid(self):
+        self.profile = [ 1.0 / len(self.game.choices) for i in self.game.choices ]
+
+    def normalize(self):
+        den = sum(self.profile)
+        if den != 0:
+            self.profile = [ x/den for x in self.profile ]
+                
     def strategy_value(self, st):
         return sum([ prob * self.game.payoff(self.game.choices[st],
                                              self.game.statistics[i])

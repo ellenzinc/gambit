@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/simpdiv/nfgsimpdiv.cc
 // Compute Nash equilibria via simplicial subdivision on the normal form
@@ -28,6 +28,9 @@
 #include <iomanip>
 #include <fstream>
 #include "libgambit/libgambit.h"
+#include "libgambit/nash.h"
+
+using namespace Gambit;
 
 //
 // simpdiv is a simplicial subdivision algorithm with restart, for finding
@@ -65,529 +68,537 @@
 // simplify things. (TLT, 6/2002)
 //
 
-
-//
-// Global options
-//
-
-bool g_verbose = false;
-bool g_useFloat = false;
-int g_numDecimals = 6;
-int g_gridResize = 2;
-
-class nfgSimpdiv {
-private:
-  int m_nRestarts, m_leashLength;
-
-  int t, ibar;
-  Gambit::Rational d,pay,maxz,bestz;
-
-  Gambit::Rational Simplex(Gambit::MixedStrategyProfile<Gambit::Rational> &);
-  Gambit::Rational getlabel(Gambit::MixedStrategyProfile<Gambit::Rational> &yy, Gambit::Array<int> &, Gambit::PVector<Gambit::Rational> &);
-  void update(Gambit::RectArray<int> &, Gambit::RectArray<int> &, Gambit::PVector<Gambit::Rational> &,
-	      const Gambit::PVector<int> &, int j, int i);
-  void getY(Gambit::MixedStrategyProfile<Gambit::Rational> &x, Gambit::PVector<Gambit::Rational> &, 
-	    const Gambit::PVector<int> &, const Gambit::PVector<int> &, 
-	    const Gambit::PVector<Gambit::Rational> &, const Gambit::RectArray<int> &, int k);
-  void getnexty(Gambit::MixedStrategyProfile<Gambit::Rational> &x, const Gambit::RectArray<int> &,
-		const Gambit::PVector<int> &, int i);
-  int get_c(int j, int h, int nstrats, const Gambit::PVector<int> &);
-  int get_b(int j, int h, int nstrats, const Gambit::PVector<int> &);
-  
+class NashSimpdivStrategySolver : public NashStrategySolver<Rational> {
 public:
-  nfgSimpdiv(void);
-  virtual ~nfgSimpdiv();
+  NashSimpdivStrategySolver(int p_gridResize = 2, int p_leashLength = 0,
+			    bool p_verbose = false,
+			    shared_ptr<StrategyProfileRenderer<Rational> > p_onEquilibrium = 0)
+    : NashStrategySolver<Rational>(p_onEquilibrium),
+      m_gridResize(p_gridResize),
+      m_leashLength((p_leashLength > 0) ? p_leashLength : 32000),
+      m_verbose(p_verbose)
+  { }
+  virtual ~NashSimpdivStrategySolver() { }
 
-  int NumRestarts(void) const { return m_nRestarts; }
-  void SetNumRestarts(int p_nRestarts) { m_nRestarts = p_nRestarts; }
+  List<MixedStrategyProfile<Rational> > Solve(const MixedStrategyProfile<Rational> &p_start) const;
+  List<MixedStrategyProfile<Rational> > Solve(const Game &p_game) const
+  { return Solve(p_game->NewMixedStrategyProfile(Rational(0))); }
 
-  int LeashLength(void) const { return m_leashLength; }
-  void SetLeashLength(int p_leashLength) { m_leashLength = p_leashLength; }
 
-  void Solve(const Gambit::Game &, const Gambit::MixedStrategyProfile<Gambit::Rational> &);
+private:
+  int m_gridResize, m_leashLength;
+  bool m_verbose;
+
+  class State {
+  public:
+    int t, ibar;
+    Rational d, pay, maxz, bestz;
+    
+    State(void) : t(0), ibar(1), bestz(1.0e30) { }
+    Rational getlabel(MixedStrategyProfile<Rational> &yy, Array<int> &, 
+		      PVector<Rational> &);
+  };
+
+  Rational Simplex(MixedStrategyProfile<Rational> &, const Rational &d) const;
+  void update(State &, RectArray<int> &, RectArray<int> &, PVector<Rational> &,
+	      const PVector<int> &, int j, int i) const;
+  void getY(State &, MixedStrategyProfile<Rational> &x, PVector<Rational> &, 
+	    const PVector<int> &, const PVector<int> &, 
+	    const PVector<Rational> &, const RectArray<int> &, int k) const;
+  void getnexty(State &, 
+		MixedStrategyProfile<Rational> &x, const RectArray<int> &,
+		const PVector<int> &, int i) const;
+  int get_c(int j, int h, int nstrats, const PVector<int> &) const;
+  int get_b(int j, int h, int nstrats, const PVector<int> &) const;
+  
 };
 
-
 //-------------------------------------------------------------------------
-//               nfgSimpdiv: Constructor and destructor
+//          NashSimpdivStrategySolver: Private member functions
 //-------------------------------------------------------------------------
 
-nfgSimpdiv::nfgSimpdiv(void)
-  : m_nRestarts(20), m_leashLength(0)
+inline GameStrategy GetStrategy(const Game &game, int pl, int st)
 {
-  t = 0;
-  ibar = 1;
+  return game->Players()[pl]->Strategies()[st];
 }
 
-nfgSimpdiv::~nfgSimpdiv()
-{ }
-
-
-//-------------------------------------------------------------------------
-//               nfgSimpdiv: Private member functions
-//-------------------------------------------------------------------------
-
-Gambit::Rational nfgSimpdiv::Simplex(Gambit::MixedStrategyProfile<Gambit::Rational> &y)
+Rational 
+NashSimpdivStrategySolver::Simplex(MixedStrategyProfile<Rational> &y,
+				   const Rational &d) const
 {
-  Gambit::Array<int> ylabel(2);
-  Gambit::RectArray<int> labels(y.MixedProfileLength(), 2), pi(y.MixedProfileLength(), 2);
-  Gambit::PVector<int> U(y.GetSupport().NumStrategies()), TT(y.GetSupport().NumStrategies());
-  Gambit::PVector<Gambit::Rational> ab(y.GetSupport().NumStrategies());
-  Gambit::PVector<Gambit::Rational> besty(y.GetSupport().NumStrategies());
-  Gambit::PVector<Gambit::Rational> v(y.GetSupport().NumStrategies());
+  Game game = y.GetGame();
+  State state;
+  state.d = d;
+  Array<int> nstrats(game->NumStrategies());
+  Array<int> ylabel(2);
+  RectArray<int> labels(y.MixedProfileLength(), 2), pi(y.MixedProfileLength(), 2);
+  PVector<int> U(nstrats), TT(nstrats);
+  PVector<Rational> ab(nstrats), besty(nstrats), v(nstrats);
   for (int i = 1; i <= v.Length(); i++) {
     v[i] = y[i];
   }
-  besty = (const Gambit::Vector<Gambit::Rational> &) y;
-
+  besty = static_cast<Vector<Rational> &>(y);
   int i = 0;
   int j, k, h, jj, hh,ii, kk,tot;
-  Gambit::Rational maxz;
+  Rational maxz;
 
 // Label step0 not currently used, hence commented
-// step0:;
-  ibar=1;
-  t=0;
-  for(j=1;j<=y.GetGame()->NumPlayers();j++)
-    {
-      for(h=1;h<=y.GetSupport().NumStrategies(j);h++)
-	{
-	  TT(j,h)=0;
-	  U(j,h)=0;
-	  if(v(j,h)==Gambit::Rational(0))U(j,h)=1;
-	  ab(j,h)=Gambit::Rational(0);
-	  y[y.GetSupport().GetStrategy(j,h)]=v(j,h);
-	}
+// step0:
+  TT = 0;
+  U = 0;
+  ab = Rational(0);
+  for (j = 1; j <= game->NumPlayers(); j++)  {
+    GamePlayer player = game->Players()[j];
+    for (h = 1; h <= nstrats[j]; h++)  {
+      if (v(j,h) == Rational(0)) {
+	U(j,h) = 1;
+      }
+      y[player->Strategies()[h]] = v(j,h);
     }
-  
- step1:;
-  
-  maxz=getlabel(y, ylabel, besty);
-  j=ylabel[1];
-  h=ylabel[2];
-  labels(ibar,1)=j;
-  labels(ibar,2)=h;
+  }
+
+ step1:
+  maxz = state.getlabel(y, ylabel, besty);
+  j = ylabel[1];
+  h = ylabel[2];
+  labels(state.ibar,1) = j;
+  labels(state.ibar,2) = h;
   
 // Label case1a not currently used, hence commented
-// case1a:;
-  if(TT(j,h)==0 && U(j,h)==0)
-    {
-      for(hh=1,tot=0;hh<=y.GetSupport().NumStrategies(j);hh++)
-	if(TT(j,hh)==1 || U(j,hh)==1)tot++;
-      if(tot==y.GetSupport().NumStrategies(j)-1)goto end;
-      else {
-	i=t+1;
-	goto step2;
+// case1a:
+  if (TT(j,h)==0 && U(j,h)==0)  {
+    for (hh=1, tot=0; hh <= nstrats[j]; hh++) {
+      if (TT(j,hh)==1 || U(j,hh)==1) {
+	tot++;
       }
     }
-      /* case1b */
-  else if(TT(j,h))
-    {
-      i=1;
-      while(labels(i,1)!=j || labels(i,2)!=h || i==ibar) i++;
-      goto step3;
-    }
-      /* case1c */
-  else if(U(j,h))
-    {
-      k=h;
-      while(U(j,k)){k++;if(k>y.GetSupport().NumStrategies(j))k=1;}
-      if(TT(j,k)==0)i=t+1;
-      else {
-	i=1;
-	while((pi(i,1)!=j || pi(i,2)!=k) && i<=t)i++;
-      }
+    if (tot == nstrats[j] - 1) {
+      goto end;
+    }      
+    else {
+      i = state.t+1;
       goto step2;
     }
+  }
+  /* case1b */
+  else if (TT(j,h))  {
+    i = 1;
+    while (labels(i,1) != j || labels(i,2) != h || i == state.ibar)  {
+      i++;
+    }
+    goto step3;
+  }
+  /* case1c */
+  else if (U(j,h)) {
+    k = h;
+    while (U(j,k)) {
+      k++;
+      if (k > nstrats[j]) {
+	k = 1;
+      }
+    }
+    if (TT(j,k) == 0) {
+      i = state.t+1;
+    }
+    else {
+      i = 1;
+      while ((pi(i,1)!=j || pi(i,2)!=k) && i<=state.t) {
+	i++;
+      }
+    }
+    goto step2;
+  }
   
- step2:;
-  getY(y,v,U,TT,ab,pi,i);
-  pi.RotateDown(i,t+1);
-  pi(i,1)=j;
-  pi(i,2)=h;
-  labels.RotateDown(i+1,t+2);
-  ibar=i+1;
-  t++;
-  getnexty(y,pi,U,i);
-  TT(j,h)=1;
-  U(j,h)=0;
+ step2:
+  getY(state, y, v, U, TT, ab, pi, i);
+  pi.RotateDown(i, state.t+1);
+  pi(i,1) = j;
+  pi(i,2) = h;
+  labels.RotateDown(i+1, state.t+2);
+  state.ibar = i+1;
+  state.t++;
+  getnexty(state, y, pi, U, i);
+  TT(j,h) = 1;
+  U(j,h) = 0;
   goto step1;
   
- step3:;
-  if(i==t+1)ii=t;
-  else ii=i;
-  j=pi(ii,1);
-  h=pi(ii,2);
-  k=h;
-  if(i<t+1)k=get_b(j,h,y.GetSupport().NumStrategies(j),U);
-  kk=get_c(j,h,y.GetSupport().NumStrategies(j),U);
-  if(i==1)ii=t+1;
-  else if(i==t+1)ii=1;
-  else ii=i-1;
-  getY(y,v,U,TT,ab,pi,ii);
+ step3:
+  ii = (i == state.t+1) ? state.t : 1;
+  j = pi(ii,1);
+  h = pi(ii,2);
+  k = h;
+  if (i < state.t+1) {
+    k = get_b(j, h, nstrats[j], U);
+  }
+  kk = get_c(j, h, nstrats[j], U);
+  if (i == 1) {
+    ii = state.t+1;
+  }
+  else if (i == state.t+1) {
+    ii = 1;
+  }
+  else {
+    ii = i-1;
+  }
+  getY(state, y, v, U, TT, ab, pi, ii);
   
-      /* case3a */
-  if(i==1 && (y[y.GetSupport().GetStrategy(j,k)]<=Gambit::Rational(0) || 
-	      (v(j,k)-y[y.GetSupport().GetStrategy(j,k)])>=(Gambit::Rational(m_leashLength))*d)) {
-    for(hh=1,tot=0;hh<=y.GetSupport().NumStrategies(j);hh++)
-      if(TT(j,hh)==1 || U(j,hh)==1)tot++;
-    if(tot==y.GetSupport().NumStrategies(j)-1) {
+  /* case3a */
+  if (i==1 && 
+      (y[GetStrategy(game, j, k)]<=Rational(0) || 
+       (v(j,k)-y[GetStrategy(game, j, k)]) >= Rational(m_leashLength)*state.d)) {
+    for (hh = 1, tot = 0; hh <= nstrats[j]; hh++) {
+      if (TT(j,hh)==1 || U(j,hh)==1)  {
+	tot++;
+      }
+    }
+    if (tot == nstrats[j] - 1) {
       U(j,k)=1;
       goto end;
     }
     else {
-      update(pi,labels,ab,U,j,i);
-      U(j,k)=1;
-      getnexty(y,pi,U,t);
+      update(state, pi, labels, ab, U, j, i);
+      U(j,k) = 1;
+      getnexty(state, y, pi, U, state.t);
       goto step1;
     }
   }
-      /* case3b */
-  else if(i>=2 && i<=t &&
-	  (y[y.GetSupport().GetStrategy(j,k)]<=Gambit::Rational(0) || (v(j,k)-y[y.GetSupport().GetStrategy(j,k)])>=(Gambit::Rational(m_leashLength))*d)) {
+  /* case3b */
+  else if (i>=2 && i<=state.t &&
+	   (y[GetStrategy(game, j, k)] <= Rational(0) || 
+	    (v(j,k)-y[GetStrategy(game, j, k)]) >= Rational(m_leashLength)*state.d)) {
     goto step4;
   }
-      /* case3c */
-  else if(i==t+1 && ab(j,kk)==Gambit::Rational(0)) {
-    if(y[y.GetSupport().GetStrategy(j,h)]<=Gambit::Rational(0) || (v(j,h)-y[y.GetSupport().GetStrategy(j,h)])>=(Gambit::Rational(m_leashLength))*d)goto step4;
+  /* case3c */
+  else if (i==state.t+1 && ab(j,kk) == Rational(0)) {
+    if (y[GetStrategy(game, j, h)] <= Rational(0) || 
+	(v(j,h)-y[GetStrategy(game, j, h)]) >= Rational(m_leashLength)*state.d) {
+      goto step4;
+    }
     else {
       k=0;
-      while(ab(j,kk)==Gambit::Rational(0) && k==0) {
+      while (ab(j,kk) == Rational(0) && k==0) {
 	if(kk==h)k=1;
 	kk++;
-	if(kk>y.GetSupport().NumStrategies(j))kk=1;
+	if (kk > nstrats[j]) {
+	  kk=1; 
+	}
       }
       kk--;
-      if(kk==0)kk=y.GetSupport().NumStrategies(j);
-      if(kk==h)goto step4;
-      else goto step5;
+      if (kk == 0) {
+	kk = nstrats[j];
+      }
+      if (kk == h) {
+	goto step4;
+      }
+      else {
+	goto step5;
+      }
     }
   }
   else {
-      if(i==1) getnexty(y,pi,U,1);
-      else if(i<=t) getnexty(y,pi,U,i);
-      else if(i==t+1) {
-	j=pi(t,1);
-	h=pi(t,2);
-	hh=get_b(j,h,y.GetSupport().NumStrategies(j),U);
-	y[y.GetSupport().GetStrategy(j,h)]-=d;
-	y[y.GetSupport().GetStrategy(j,hh)]+=d;
-      }
-      update(pi,labels,ab,U,j,i);
+    if (i==1) {
+      getnexty(state, y, pi, U, 1);
     }
-  goto step1;
- step4:;
-  getY(y,v,U,TT,ab,pi,1);
-  j=pi(i-1,1);
-  h=pi(i-1,2);
-  TT(j,h)=0;
-  if(y[y.GetSupport().GetStrategy(j,h)]<=Gambit::Rational(0) || (v(j,h)-y[y.GetSupport().GetStrategy(j,h)])>=(Gambit::Rational(m_leashLength))*d)U(j,h)=1;
-  labels.RotateUp(i,t+1);
-  pi.RotateUp(i-1,t);
-  t--;
-  ii=1;
-  while(labels(ii,1)!=j || labels(ii,2)!=h) {ii++;}
-  i=ii;
-  goto step3;
- step5:;
-  k=kk;
-
-  labels.RotateDown(1,t+1);
-  ibar=1;
-  pi.RotateDown(1,t);
-  U(j,k)=0;
-  jj=pi(1,1);
-  hh=pi(1,2);
-  kk=get_b(jj,hh,y.GetSupport().NumStrategies(jj),U);
-  y[y.GetSupport().GetStrategy(jj,hh)]-=d;
-  y[y.GetSupport().GetStrategy(jj,kk)]+=d;
-  
-  k=get_c(j,h,y.GetSupport().NumStrategies(j),U);
-  kk=1;
-  while(kk){
-    if(k==h)kk=0;
-    ab(j,k)=(ab(j,k)-(Gambit::Rational(1)));
-    k++;
-    if(k>y.GetSupport().NumStrategies(j))k=1;
+    else if (i<=state.t) {
+      getnexty(state, y, pi, U, i);
+    }
+    else if (i==state.t+1) {
+      j = pi(state.t,1);
+      h = pi(state.t,2);
+      hh = get_b(j,h,nstrats[j],U);
+      y[GetStrategy(game, j, h)] -= state.d;
+      y[GetStrategy(game, j, hh)] += state.d;
+    }
+    update(state, pi, labels, ab, U, j, i);
   }
   goto step1;
 
- end:;
-  maxz=bestz;
-  for(i=1;i<=y.GetGame()->NumPlayers();i++)
-    for(j=1;j<=y.GetSupport().NumStrategies(i);j++)
-      y[y.GetSupport().GetStrategy(i,j)]=besty(i,j);
+ step4:
+  getY(state, y, v, U, TT, ab, pi, 1);
+  j = pi(i-1,1);
+  h = pi(i-1,2);
+  TT(j,h) = 0;
+  if (y[GetStrategy(game, j, h)] <= Rational(0) || 
+      (v(j,h)-y[GetStrategy(game, j, h)]) >= Rational(m_leashLength)*state.d) {
+    U(j,h) = 1;
+  }
+  labels.RotateUp(i,state.t+1);
+  pi.RotateUp(i-1,state.t);
+  state.t--;
+  ii=1;
+  while (labels(ii,1)!=j || labels(ii,2)!=h) {
+    ii++;
+  }
+  i=ii;
+  goto step3;
+
+ step5:
+  k=kk;
+  labels.RotateDown(1,state.t+1);
+  state.ibar=1;
+  pi.RotateDown(1,state.t);
+  U(j,k)=0;
+  jj=pi(1,1);
+  hh=pi(1,2);
+  kk=get_b(jj,hh,nstrats[jj],U);
+  y[GetStrategy(game, jj, hh)] -= state.d;
+  y[GetStrategy(game, jj, kk)] += state.d;
+  
+  k = get_c(j,h,nstrats[j],U);
+  kk=1;
+  while(kk){
+    if (k == h) {
+      kk = 0;
+    }
+    ab(j,k) -= Rational(1);
+    k++;
+    if (k > nstrats[j]) {
+      k = 1;
+    }
+  }
+  goto step1;
+
+ end:
+  maxz=state.bestz;
+  for (i = 1; i <= game->NumPlayers(); i++) {
+    for (j = 1; j <= nstrats[i]; j++) {
+      y[GetStrategy(game, i, j)] = besty(i,j);
+    }
+  }
   return maxz;
 }
 
-void nfgSimpdiv::update(Gambit::RectArray<int> &pi,
-			Gambit::RectArray<int> &labels,
-			Gambit::PVector<Gambit::Rational> &ab,
-			const Gambit::PVector<int> &U,
-			int j, int i)
+void NashSimpdivStrategySolver::update(State &state,
+				       RectArray<int> &pi,
+				       RectArray<int> &labels,
+				       PVector<Rational> &ab,
+				       const PVector<int> &U,
+				       int j, int i) const
 {
   int jj, hh, k,f;
   
   f=1;
-  if(i>=2 && i<=t) {
+  if(i>=2 && i<=state.t) {
     pi.SwitchRows(i,i-1);
-    ibar=i;
+    state.ibar=i;
   }
   else if(i==1) {
-    labels.RotateUp(1,t+1);
-    ibar=t+1;
+    labels.RotateUp(1,state.t+1);
+    state.ibar=state.t+1;
     jj=pi(1,1);
     hh=pi(1,2);
     if(jj==j) {
       k=get_c(jj,hh,ab.Lengths()[jj],U);
       while(f) {
 	if(k==hh)f=0;
-	ab(j,k)=ab(j,k) + (Gambit::Rational(1));
+	ab(j,k) += Rational(1);
 	k++;
 	if(k>ab.Lengths()[jj])k=1;
       }
-      pi.RotateUp(1,t);
+      pi.RotateUp(1,state.t);
     }
   }
-  else if(i==t+1) {
-    labels.RotateDown(1,t+1);
-    ibar=1;
-    jj=pi(t,1);
-    hh=pi(t,2);
+  else if(i==state.t+1) {
+    labels.RotateDown(1,state.t+1);
+    state.ibar=1;
+    jj=pi(state.t,1);
+    hh=pi(state.t,2);
     if(jj==j) {
       k=get_c(jj,hh,ab.Lengths()[jj],U);
       while(f) {
 	if(k==hh)f=0;
-	ab(j,k)= ab(j,k)-(Gambit::Rational(1));
+	ab(j,k) -= Rational(1);
 	k++;
 	if(k>ab.Lengths()[jj])k=1;
       }
-      pi.RotateDown(1,t);
+      pi.RotateDown(1,state.t);
     }
   }
 }
 
-void nfgSimpdiv::getY(Gambit::MixedStrategyProfile<Gambit::Rational> &x,
-		      Gambit::PVector<Gambit::Rational> &v, 
-		      const Gambit::PVector<int> &U,
-		      const Gambit::PVector<int> &TT,
-		      const Gambit::PVector<Gambit::Rational> &ab,
-		      const Gambit::RectArray<int> &pi,
-		      int k)
+void NashSimpdivStrategySolver::getY(State &state,
+				     MixedStrategyProfile<Rational> &x,
+				     PVector<Rational> &v, 
+				     const PVector<int> &U,
+				     const PVector<int> &TT,
+				     const PVector<Rational> &ab,
+				     const RectArray<int> &pi,
+				     int k) const
 {
-  int j, h, i,hh;
-  
-  for(j=1;j<=x.GetGame()->NumPlayers();j++)
-    for(h=1;h<=x.GetSupport().NumStrategies(j);h++)
-      x[x.GetSupport().GetStrategy(j,h)]=v(j,h);
-  for(j=1;j<=x.GetGame()->NumPlayers();j++)
-    for(h=1;h<=x.GetSupport().NumStrategies(j);h++)
-      if(TT(j,h)==1 || U(j,h)==1) {
-	x[x.GetSupport().GetStrategy(j,h)]+=(d*ab(j,h));
-	hh=h-1;
-	if(hh==0)hh=x.GetSupport().NumStrategies(j);
-	x[x.GetSupport().GetStrategy(j,hh)]-=(d*ab(j,h));
+  static_cast<Vector<Rational> & >(x) = v;
+  for (int j = 1; j <= x.GetGame()->Players().size(); j++) {
+    GamePlayer player = x.GetGame()->Players()[j];
+    for (int h = 1; h <= player->Strategies().size(); h++) {
+      if (TT(j,h) == 1 || U(j,h) == 1) {
+	x[player->Strategies()[h]] += state.d*ab(j,h);
+	int hh = (h > 1) ? h-1 : player->Strategies().size();
+	x[player->Strategies()[hh]] -= state.d*ab(j,h);
       }
-  i=2;
-  while(i<=k) {
-    getnexty(x,pi,U,i-1);
-    i++;
+    }
+  }
+  for (int i = 2; i <= k; i++) {
+    getnexty(state, x, pi, U, i-1);
   }
 }
 
-void nfgSimpdiv::getnexty(Gambit::MixedStrategyProfile<Gambit::Rational> &x,
-			  const Gambit::RectArray<int> &pi, 
-			  const Gambit::PVector<int> &U,
-			  int i)
+void NashSimpdivStrategySolver::getnexty(State &state,
+					 MixedStrategyProfile<Rational> &x,
+					 const RectArray<int> &pi, 
+					 const PVector<int> &U,
+					 int i) const
 {
-  int j,h,hh;
-  
-  //assert(i>=1);
-  j=pi(i,1);
-  h=pi(i,2);
-  x[x.GetSupport().GetStrategy(j,h)]+=d;
-  hh=get_b(j,h,x.GetSupport().NumStrategies(j),U);
-  x[x.GetSupport().GetStrategy(j,hh)]-=d;
+  int j = pi(i,1);
+  GamePlayer player = x.GetGame()->Players()[j];
+  int h = pi(i,2);
+  x[player->Strategies()[h]] += state.d;
+  int hh = get_b(j, h, player->Strategies().size(), U);
+  x[player->Strategies()[hh]] -= state.d;
 }
 
-int nfgSimpdiv::get_b(int j, int h, int nstrats,
-		      const Gambit::PVector<int> &U)
+int NashSimpdivStrategySolver::get_b(int j, int h, int nstrats, const PVector<int> &U) const
 {
-  int hh;
-  
-  hh=h-1;
-  if(hh==0)hh=nstrats;
-  while(U(j,hh)) {
+  int hh = (h > 1) ? h-1 : nstrats;
+  while (U(j,hh)) {
     hh--;
-    if(hh==0)hh=nstrats;
+    if (hh == 0) { 
+      hh = nstrats;
+    }
   }
   return hh;
 }
 
-int nfgSimpdiv::get_c(int j, int h, int nstrats,
-		      const Gambit::PVector<int> &U)
+int NashSimpdivStrategySolver::get_c(int j, int h, int nstrats,
+				     const PVector<int> &U) const
 {
-  int hh;
-  
-  hh=get_b(j,h,nstrats,U);
-  hh++;
-  if(hh > nstrats)hh=1;
-  return hh;
+  int hh = get_b(j, h, nstrats, U) + 1;
+  return (hh > nstrats) ? 1 : hh;
 }
 
-Gambit::Rational nfgSimpdiv::getlabel(Gambit::MixedStrategyProfile<Gambit::Rational> &yy,
-			       Gambit::Array<int> &ylabel,
-			       Gambit::PVector<Gambit::Rational> &besty)
+Rational 
+NashSimpdivStrategySolver::State::getlabel(MixedStrategyProfile<Rational> &yy,
+					   Array<int> &ylabel,
+					   PVector<Rational> &besty)
 {
-  int i,j,jj;
-  Gambit::Rational maxz,payoff,maxval;
+  Rational maxz = -1000000;
+  ylabel[1] = 1;
+  ylabel[2] = 1;
   
-  maxz=(Gambit::Rational(-1000000));
-  
-  ylabel[1]=1;
-  ylabel[2]=1;
-  
-  for(i=1;i<=yy.GetGame()->NumPlayers();i++) {
-    payoff=Gambit::Rational(0);
-    maxval=(Gambit::Rational(-1000000));
-    jj=0;
-    for(j=1;j<=yy.GetSupport().NumStrategies(i);j++) {
-      pay=yy.GetPayoff(yy.GetSupport().GetStrategy(i,j));
-      payoff+=(yy[yy.GetSupport().GetStrategy(i,j)]*pay);
-      if(pay>maxval) {
-	maxval=pay;
-	jj=j;
+  for (int i = 1; i <= yy.GetGame()->NumPlayers(); i++) {
+    GamePlayer player = yy.GetGame()->Players()[i];
+    Rational payoff = 0;
+    Rational maxval = -1000000;
+    int jj = 0;
+    for (int j = 1; j <= player->Strategies().size(); j++) {
+      pay = yy.GetPayoff(player->Strategies()[j]);
+      payoff += yy[player->Strategies()[j]] * pay;
+      if (pay > maxval) {
+	maxval = pay;
+	jj = j;
       }
     }
-    //assert(jj>0);
-    if((maxval-payoff)>maxz) {
-      maxz=maxval-payoff;
-      ylabel[1]=i;
-      ylabel[2]=jj;
+    if (maxval - payoff > maxz) {
+      maxz = maxval - payoff;
+      ylabel[1] = i;
+      ylabel[2] = jj;
     }
   }
-  if(maxz<bestz) {
-    bestz=maxz;
-    for(i=1;i<=yy.GetGame()->NumPlayers();i++)
-      for(j=1;j<=yy.GetSupport().NumStrategies(i);j++)
-	besty(i,j)=yy[yy.GetSupport().GetStrategy(i,j)];
+  if (maxz < bestz) {
+    bestz = maxz;
+    for (int i = 1; i <= yy.GetGame()->NumPlayers(); i++) {
+      GamePlayer player = yy.GetGame()->Players()[i];
+      for (int j = 1; j <= player->Strategies().size(); j++) {
+	besty(i,j) = yy[player->Strategies()[j]];
+      }
+    }
   }
   return maxz;
 }
 
 
 //-------------------------------------------------------------------------
-//               nfgSimpdiv: Main solution algorithm
+//           NashSimpdivStrategySolver: Main solution algorithm
 //-------------------------------------------------------------------------
 
-void PrintProfile(std::ostream &p_stream,
-		  const std::string &p_label,
-		  const Gambit::MixedStrategyProfile<Gambit::Rational> &p_profile)
+List<MixedStrategyProfile<Rational> > 
+ReadProfiles(const Game &p_game, std::istream &p_stream)
 {
-  p_stream << p_label;
-  for (int i = 1; i <= p_profile.MixedProfileLength(); i++) {
-    if (g_useFloat) {
-      p_stream.setf(std::ios::fixed);
-      p_stream << "," << std::setprecision(g_numDecimals) << ((double) p_profile[i]);
+  List<MixedStrategyProfile<Rational> > profiles;
+  while (!p_stream.eof() && !p_stream.bad()) {
+    MixedStrategyProfile<Rational> p(p_game->NewMixedStrategyProfile(Rational(0)));
+    for (int i = 1; i <= p.MixedProfileLength(); i++) {
+      if (p_stream.eof() || p_stream.bad()) {
+	break;
+      }
+      p_stream >> p[i];
+      if (i < p.MixedProfileLength()) {
+	char comma;
+	p_stream >> comma;
+      }
     }
-    else {
-      p_stream << "," << p_profile[i];
-    }
+    // Read in the rest of the line and discard
+    std::string foo;
+    std::getline(p_stream, foo);
+    profiles.push_back(p);
   }
-
-  p_stream << std::endl;
+  return profiles;
 }
 
-bool ReadProfile(std::istream &p_stream,
-		 Gambit::MixedStrategyProfile<Gambit::Rational> &p_profile)
+List<MixedStrategyProfile<Rational> > 
+RandomProfiles(const Game &p_game, int p_count, const Rational &denom)
 {
-  for (int i = 1; i <= p_profile.MixedProfileLength(); i++) {
-    if (p_stream.eof() || p_stream.bad()) {
-      return false;
-    }
-
-    p_stream >> p_profile[i];
-    if (i < p_profile.MixedProfileLength()) {
-      char comma;
-      p_stream >> comma;
-    }
+  List<MixedStrategyProfile<Rational> > profiles;
+  for (int i = 1; i <= p_count; i++) {
+    MixedStrategyProfile<Rational> p(p_game->NewMixedStrategyProfile(Rational(0)));
+    p.Randomize(denom);
+    profiles.push_back(p);
   }
-
-  // Read in the rest of the line and discard
-  std::string foo;
-  std::getline(p_stream, foo);
-  return true;
+  return profiles;
 }
 
-Gambit::Integer find_lcd(const Gambit::Vector<Gambit::Rational> &vec)
+Integer find_lcd(const Vector<Rational> &vec)
 {
-  Gambit::Integer lcd(1);
+  Integer lcd(1);
   for (int i = vec.First(); i <= vec.Last(); i++) {
     lcd = lcm(vec[i].denominator(), lcd);
   }
   return lcd;
 }
 
-void nfgSimpdiv::Solve(const Gambit::Game &p_nfg, 
-		       const Gambit::MixedStrategyProfile<Gambit::Rational> &p_start)
+List<MixedStrategyProfile<Rational> >
+NashSimpdivStrategySolver::Solve(const MixedStrategyProfile<Rational> &p_start) const
 {
-  // A raft of initializations moved here from the former constructor.
-  // This algorithm is in need of some serious reorganization!
-  t = 0;
-  ibar = 1;
-
-  if (m_leashLength == 0) {
-    m_leashLength = 32000;  // not the best way to do this.  Change this!
+  if (!p_start.GetGame()->IsPerfectRecall()) {
+    throw UndefinedException("Computing equilibria of games with imperfect recall is not supported.");
   }
-  bestz = 1.0e30;          // ditto
-
-  Gambit::Integer k = find_lcd((const Gambit::Vector<Gambit::Rational> &) p_start);
-  d = Gambit::Rational(1, k);
+  Integer k = find_lcd((const Vector<Rational> &) p_start);
+  Rational d = Rational(1, k);
     
-  Gambit::MixedStrategyProfile<Gambit::Rational> y(p_start);
-  if (g_verbose) {
-    PrintProfile(std::cout, "start", y);
+  MixedStrategyProfile<Rational> y(p_start);
+  if (m_verbose) {
+    this->m_onEquilibrium->Render(y, "start");
   }
 
   while (true) {
     const double TOL = 1.0e-10;
-    d /= g_gridResize;
-    maxz = Simplex(y);
+    d /= m_gridResize;
+    Rational maxz = Simplex(y, d);
     
-    if (g_verbose) {
-      PrintProfile(std::cout, Gambit::lexical_cast<std::string>(d), y);
+    if (m_verbose) {
+      this->m_onEquilibrium->Render(y, lexical_cast<std::string>(d));
     }
-    if (maxz < Gambit::Rational(TOL)) break;
+    if (maxz < Rational(TOL)) break;
   }
     
-  PrintProfile(std::cout, "NE", y);
-}
-
-void Randomize(Gambit::MixedStrategyProfile<Gambit::Rational> &p_profile, int p_denom)
-{
-  Gambit::Game nfg = p_profile.GetGame();
-
-  ((Gambit::Vector<Gambit::Rational> &) p_profile) = Gambit::Rational(0);
-
-  for (int pl = 1; pl <= nfg->NumPlayers(); pl++) {
-    int sum = 0;
-    for (int st = 1; sum < p_denom && st < nfg->GetPlayer(pl)->NumStrategies(); st++) {
-      double r = ((double) rand() / ((double) (RAND_MAX) + 1.0));
-      double x = r * (p_denom - sum + 1);
-      int y = (int) x;
-      // y is now uniform on [0, (p_denom-sum)].
-      p_profile[p_profile.GetSupport().GetStrategy(pl, st)] = Gambit::Rational(y, p_denom);
-      sum += y;
-    }
-
-    p_profile[p_profile.GetSupport().GetStrategy(pl, nfg->GetPlayer(pl)->NumStrategies())] = Gambit::Rational(p_denom - sum, p_denom);
-  }
+  this->m_onEquilibrium->Render(y);
+  List<MixedStrategyProfile<Rational> > sol;
+  sol.push_back(y);
+  return sol;
 }
 
 void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Compute Nash equilibria using simplicial subdivision\n";
-  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
 }
 
@@ -600,8 +611,6 @@ void PrintHelp(char *progname)
   std::cerr << "With no options, computes one approximate Nash equilibrium.\n\n";
 
   std::cerr << "Options:\n";
-  std::cerr << "  -d DECIMALS      show equilibria as floating point, with DECIMALS digits\n";
-  std::cerr << "                   (default is to show as rational numbers)\n";
   std::cerr << "  -g MULT          granularity of grid refinement at each step (default is 2)\n";
   std::cerr << "  -h, --help       print this help message\n";
   std::cerr << "  -r DENOM         generate random starting points with denominator DENOM\n";
@@ -619,8 +628,8 @@ int main(int argc, char *argv[])
   opterr = 0;
   std::string startFile;
   bool useRandom = false;
-  int randDenom = 1, stopAfter = 1;
-  bool quiet = false;
+  int randDenom = 1, gridResize = 2, stopAfter = 1;
+  bool verbose = false, quiet = false;
 
   int long_opt_index = 0;
   struct option long_options[] = {
@@ -634,12 +643,8 @@ int main(int argc, char *argv[])
     switch (c) {
     case 'v':
       PrintBanner(std::cerr); exit(1);
-    case 'd':
-      g_numDecimals = atoi(optarg);
-      g_useFloat = true;
-      break;
     case 'g':
-      g_gridResize = atoi(optarg);
+      gridResize = atoi(optarg);
       break;
     case 'h':
       PrintHelp(argv[0]);
@@ -658,7 +663,7 @@ int main(int argc, char *argv[])
       quiet = true;
       break;
     case 'V':
-      g_verbose = true;
+      verbose = true;
       break;
     case 'S':
       break;
@@ -693,50 +698,33 @@ int main(int argc, char *argv[])
   }
 
   try {
-    Gambit::Game game = Gambit::ReadGame(*input_stream);
-
+    Game game = ReadGame(*input_stream);
+    List<MixedStrategyProfile<Rational> > starts;
     if (startFile != "") {
       std::ifstream startPoints(startFile.c_str());
-      
-      while (!startPoints.eof() && !startPoints.bad()) {
-	Gambit::MixedStrategyProfile<Gambit::Rational> start(game->NewMixedStrategyProfile(Gambit::Rational(0)));
-	if (ReadProfile(startPoints, start)) {
-	  nfgSimpdiv algorithm;
-	  algorithm.Solve(game, start);
-	}
-      }
+      starts = ReadProfiles(game, startPoints);
     }
     else if (useRandom) {
-      for (int i = 1; i <= stopAfter; i++) {
-	Gambit::MixedStrategyProfile<Gambit::Rational> start(game->NewMixedStrategyProfile(Gambit::Rational(0)));
-	Randomize(start, randDenom);
-	
-	nfgSimpdiv algorithm;
-	algorithm.Solve(game, start);
-      }
+      starts = RandomProfiles(game, stopAfter, randDenom);
     }
     else {
-      Gambit::MixedStrategyProfile<Gambit::Rational> start(game->NewMixedStrategyProfile(Gambit::Rational(0)));
-  
+      starts.push_back(game->NewMixedStrategyProfile(Rational(0)));
+      static_cast<Vector<Rational> &>(starts[1]) = Rational(0);
       for (int pl = 1; pl <= game->NumPlayers(); pl++) {
-	start[start.GetSupport().GetStrategy(pl, 1)] = Gambit::Rational(1);
-	for (int st = 2; st <= game->GetPlayer(pl)->NumStrategies(); st++) {
-	  start[start.GetSupport().GetStrategy(pl, st)] = Gambit::Rational(0);
-	}
+	starts[1][game->Players()[pl]->Strategies()[1]] = Rational(1);
       }
-      
-      nfgSimpdiv algorithm;
-      algorithm.Solve(game, start);
     }
-   
+    for (int i = 1; i <= starts.size(); i++) {
+      shared_ptr<StrategyProfileRenderer<Rational> > renderer;
+      renderer = new MixedStrategyCSVRenderer<Rational>(std::cout);
+      NashSimpdivStrategySolver algorithm(gridResize, 0, verbose,
+					  renderer);
+      algorithm.Solve(starts[i]);
+    }
     return 0;
   }
-  catch (Gambit::InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/logit/efglogit.h
 // Computation of agent quantal response equilibrium correspondence for
@@ -26,16 +26,37 @@
 
 #include "path.h"
 
-class Equation;
+namespace Gambit  {
+
+class LogitQREMixedBehaviorProfile {
+public:
+  LogitQREMixedBehaviorProfile(const Game &p_game)
+    : m_profile(p_game), m_lambda(0.0)
+	{ }
+
+  double GetLambda(void) const { return m_lambda; }
+  const MixedBehaviorProfile<double> &GetProfile(void) const { return m_profile; }
+
+  Game GetGame(void) const              { return m_profile.GetGame(); }
+  int BehaviorProfileLength(void) const { return m_profile.Length(); }
+  double operator[](int i) const        { return m_profile[i]; }
+  
+private:
+  const MixedBehaviorProfile<double> m_profile;
+  double m_lambda;
+};
+
 
 class AgentQREPathTracer : public PathTracer {
 public:
-  AgentQREPathTracer(const MixedBehavProfile<double> &p_start);
-  virtual ~AgentQREPathTracer();
+  AgentQREPathTracer(void) : m_fullGraph(true), m_decimals(6) { }
+  virtual ~AgentQREPathTracer() { }
 
   void 
-  TraceAgentPath(const MixedBehavProfile<double> &p_start,
-		 double p_startLambda, double p_maxLambda, double p_omega);
+  TraceAgentPath(const LogitQREMixedBehaviorProfile &p_start,
+		 std::ostream &p_stream,
+		 double p_maxLambda, double p_omega,
+		 double p_targetLambda=-1.0);
 
   void SetFullGraph(bool p_fullGraph) { m_fullGraph = p_fullGraph; }
   bool GetFullGraph(void) const { return m_fullGraph; }
@@ -43,25 +64,16 @@ public:
   void SetDecimals(int p_decimals) { m_decimals = p_decimals; }
   int GetDecimals(void) const { return m_decimals; }
 
-protected:
-  virtual void OnStep(const Vector<double> &, bool);
-
-  virtual double Criterion(const Vector<double> &, const Vector<double> &);
-
-  // Compute the LHS of the system of equations at the specified point.
-  virtual void GetLHS(const Vector<double> &p_point, Vector<double> &p_lhs);
-  // Compute the Jacobian matrix at the specified point.
-  virtual void GetJacobian(const Vector<double> &p_point, Matrix<double> &p_matrix);
-
 private:
-  MixedBehavProfile<double> m_start;
-  Array<Equation *> m_equations;
   bool m_fullGraph;
   int m_decimals;
 
-  void PrintProfile(std::ostream &p_stream, const Vector<double> &x,
-		    bool p_isTerminal);
+  class EquationSystem;
+  class CallbackFunction;
+  class LambdaCriterion;
 };
 
+}  // end namespace Gambit
 
 #endif  // EFGLOGIT_H
+ 

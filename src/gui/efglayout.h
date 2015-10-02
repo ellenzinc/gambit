@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/gui/efglayout.h
 // Interface to tree layout representation
@@ -166,7 +166,7 @@ class gbtEfgDisplay;
 
 class gbtTreeLayout : public gbtGameView {
 private:
-  gbtEfgDisplay *m_parent;
+  /* gbtEfgDisplay *m_parent; */
   Gambit::Array<gbtNodeEntry *> m_nodeList;
   mutable int m_maxX, m_maxY, m_maxLevel;
   int m_infosetSpacing;
@@ -178,10 +178,10 @@ private:
   gbtNodeEntry *NextInfoset(gbtNodeEntry *);
   void CheckInfosetEntry(gbtNodeEntry *);
 
-  void BuildNodeList(Gambit::GameNode, const Gambit::BehavSupport &, int);
+  void BuildNodeList(Gambit::GameNode, const Gambit::BehaviorSupportProfile &, int);
 
-  int LayoutSubtree(Gambit::GameNode, const Gambit::BehavSupport &, int &, int &, int &);
-  void FillInfosetTable(Gambit::GameNode, const Gambit::BehavSupport &);
+  int LayoutSubtree(Gambit::GameNode, const Gambit::BehaviorSupportProfile &, int &, int &, int &);
+  void FillInfosetTable(Gambit::GameNode, const Gambit::BehaviorSupportProfile &);
   void UpdateTableInfosets(void);
   void UpdateTableParents(void);
 
@@ -200,8 +200,8 @@ public:
   Gambit::GameNode PriorSameLevel(Gambit::GameNode) const;
   Gambit::GameNode NextSameLevel(Gambit::GameNode) const;
 
-  void BuildNodeList(const Gambit::BehavSupport &);
-  void Layout(const Gambit::BehavSupport &);
+  void BuildNodeList(const Gambit::BehaviorSupportProfile &);
+  void Layout(const Gambit::BehaviorSupportProfile &);
   void GenerateLabels(void);
 
   // The following member functions are for temporary compatibility only

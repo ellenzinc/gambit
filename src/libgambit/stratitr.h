@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/stratitr.h
 // Normal form iterator class
@@ -32,12 +32,12 @@ namespace Gambit {
 /// on each call of NextContingency().  Optionally, the strategy of
 /// one player may be held fixed during the iteration (by the use of the
 /// second constructor).
-class StrategyIterator {
+class StrategyProfileIterator {
   friend class GameRep;
   friend class GameTableRep;
 private:
   bool m_atEnd;
-  StrategySupport m_support;
+  StrategySupportProfile m_support;
   Array<int> m_currentStrat;
   PureStrategyProfile m_profile;
   int m_frozen1, m_frozen2;
@@ -49,14 +49,14 @@ public:
   /// @name Lifecycle
   //@{
   /// Construct a new iterator on the support, with no strategies held fixed
-  StrategyIterator(const StrategySupport &);
+  StrategyProfileIterator(const StrategySupportProfile &);
   /// Construct a new iterator on the support, fixing player pl's strategy
-  StrategyIterator(const StrategySupport &s, int pl, int st);
+  StrategyProfileIterator(const StrategySupportProfile &s, int pl, int st);
   /// Construct a new iterator on the support, fixing the given strategy
-  StrategyIterator(const StrategySupport &, const GameStrategy &);
+  StrategyProfileIterator(const StrategySupportProfile &, const GameStrategy &);
   /// Construct a new iterator on the support, fixing two players' strategies
-  StrategyIterator(const StrategySupport &s, 
-		   int pl1, int st1, int pl2, int st2);
+  StrategyProfileIterator(const StrategySupportProfile &s, 
+			  int pl1, int st1, int pl2, int st2);
   //@}
 
   /// @name Iteration and data access

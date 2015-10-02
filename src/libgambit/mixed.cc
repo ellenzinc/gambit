@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/mixed.cc
 // Instantiation of template classes used in normal forms
@@ -34,6 +34,9 @@ template class Gambit::TreeMixedStrategyProfileRep<Gambit::Rational>;
 
 template class Gambit::AggMixedStrategyProfileRep<double>;
 template class Gambit::AggMixedStrategyProfileRep<Gambit::Rational>;
+
+template class Gambit::BagentMixedStrategyProfileRep<double>;
+template class Gambit::BagentMixedStrategyProfileRep<Gambit::Rational>;
 
 template class Gambit::MixedStrategyProfile<double>;
 template class Gambit::MixedStrategyProfile<Gambit::Rational>;

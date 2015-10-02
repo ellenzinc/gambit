@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/behavextend.cc
 // Algorithms for extending behavior profiles to Nash equilibria
@@ -59,7 +59,7 @@ Gambit::List<Gambit::GameNode> TerminalNodes(Gambit::Game p_efg)
 //=========================================================================
 
 static void DeviationInfosets(Gambit::List<Gambit::GameInfoset> &answer,
-			      const Gambit::BehavSupport & big_supp,
+			      const Gambit::BehaviorSupportProfile & big_supp,
 			      const Gambit::GamePlayer &pl,
 			      const Gambit::GameNode &node,
 			      const Gambit::GameAction &act)
@@ -89,7 +89,7 @@ static void DeviationInfosets(Gambit::List<Gambit::GameInfoset> &answer,
   }
 }
 
-static Gambit::List<Gambit::GameInfoset> DeviationInfosets(const Gambit::BehavSupport &big_supp,
+static Gambit::List<Gambit::GameInfoset> DeviationInfosets(const Gambit::BehaviorSupportProfile &big_supp,
 					  const Gambit::GamePlayer &pl,
 					  const Gambit::GameInfoset &iset,
 					  const Gambit::GameAction &act)
@@ -109,10 +109,10 @@ static Gambit::List<Gambit::GameInfoset> DeviationInfosets(const Gambit::BehavSu
 }
 
 static gPolyList<double> 
-ActionProbsSumToOneIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
+ActionProbsSumToOneIneqs(const Gambit::MixedBehaviorProfile<double> &p_solution,
 			 const gSpace &BehavStratSpace, 
 			 const term_order &Lex,
-			 const Gambit::BehavSupport &big_supp,
+			 const Gambit::BehaviorSupportProfile &big_supp,
 			 const Gambit::List<Gambit::List<int> > &var_index) 
 {
   gPolyList<double> answer(&BehavStratSpace, &Lex);
@@ -131,21 +131,21 @@ ActionProbsSumToOneIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
   return answer;
 }
 
-static Gambit::List<Gambit::BehavSupport> 
-DeviationSupports(const Gambit::BehavSupport & big_supp,
+static Gambit::List<Gambit::BehaviorSupportProfile> 
+DeviationSupports(const Gambit::BehaviorSupportProfile & big_supp,
 		  const Gambit::List<Gambit::GameInfoset> & isetlist,
 		  const Gambit::GamePlayer &/*pl*/,
 		  const Gambit::GameInfoset &/*iset*/,
 		  const Gambit::GameAction &/*act*/)
 {
-  Gambit::List<Gambit::BehavSupport> answer;
+  Gambit::List<Gambit::BehaviorSupportProfile> answer;
 
   Gambit::Array<int> active_act_no(isetlist.Length());
 
   for (int k = 1; k <= active_act_no.Length(); k++)
     active_act_no[k] = 0;
  
-  Gambit::BehavSupport new_supp(big_supp);
+  Gambit::BehaviorSupportProfile new_supp(big_supp);
 
   for (int i = 1; i <= isetlist.Length(); i++) {
     for (int j = 1; j < isetlist[i]->NumActions(); j++)
@@ -204,11 +204,11 @@ DeviationSupports(const Gambit::BehavSupport & big_supp,
 }
 
 static bool 
-NashNodeProbabilityPoly(const Gambit::MixedBehavProfile<double> &p_solution,
+NashNodeProbabilityPoly(const Gambit::MixedBehaviorProfile<double> &p_solution,
 			gPoly<double> & node_prob,
 			const gSpace &BehavStratSpace, 
 			const term_order &Lex,
-			const Gambit::BehavSupport &dsupp,
+			const Gambit::BehaviorSupportProfile &dsupp,
 			const Gambit::List<Gambit::List<int> > &var_index,
 			Gambit::GameNode tempnode,
 			const Gambit::GamePlayer &/*pl*/,
@@ -262,11 +262,11 @@ NashNodeProbabilityPoly(const Gambit::MixedBehavProfile<double> &p_solution,
 }
 
 static gPolyList<double> 
-NashExpectedPayoffDiffPolys(const Gambit::MixedBehavProfile<double> &p_solution,
+NashExpectedPayoffDiffPolys(const Gambit::MixedBehaviorProfile<double> &p_solution,
 			    const gSpace &BehavStratSpace, 
 			    const term_order &Lex,
-			    const Gambit::BehavSupport &little_supp,
-			    const Gambit::BehavSupport &big_supp,
+			    const Gambit::BehaviorSupportProfile &little_supp,
+			    const Gambit::BehaviorSupportProfile &big_supp,
 			    const Gambit::List<Gambit::List<int> > &var_index) 
 {
   gPolyList<double> answer(&BehavStratSpace, &Lex);
@@ -292,7 +292,7 @@ NashExpectedPayoffDiffPolys(const Gambit::MixedBehavProfile<double> &p_solution,
 								p_solution.GetGame()->GetPlayer(pl),
 							  isets_for_pl[i],
 							  acts_for_iset[j]);
-	    Gambit::List<Gambit::BehavSupport> dsupps = DeviationSupports(big_supp, 
+	    Gambit::List<Gambit::BehaviorSupportProfile> dsupps = DeviationSupports(big_supp, 
 							isetlist, 
 							p_solution.GetGame()->GetPlayer(pl),
 							isets_for_pl[i],
@@ -333,11 +333,11 @@ NashExpectedPayoffDiffPolys(const Gambit::MixedBehavProfile<double> &p_solution,
 }
 
 static gPolyList<double> 
-ExtendsToNashIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
+ExtendsToNashIneqs(const Gambit::MixedBehaviorProfile<double> &p_solution,
 		   const gSpace &BehavStratSpace, 
 		   const term_order &Lex,
-		   const Gambit::BehavSupport &little_supp,
-		   const Gambit::BehavSupport &big_supp,
+		   const Gambit::BehaviorSupportProfile &little_supp,
+		   const Gambit::BehaviorSupportProfile &big_supp,
 		   const Gambit::List<Gambit::List<int> > &var_index)
 {
   gPolyList<double> answer(&BehavStratSpace, &Lex);
@@ -354,11 +354,11 @@ ExtendsToNashIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
   return answer;
 }
 
-bool algExtendsToNash::ExtendsToNash(const Gambit::MixedBehavProfile<double> &p_solution,
-				     const Gambit::BehavSupport &little_supp,
-				     const Gambit::BehavSupport &big_supp)
+bool algExtendsToNash::ExtendsToNash(const Gambit::MixedBehaviorProfile<double> &p_solution,
+				     const Gambit::BehaviorSupportProfile &little_supp,
+				     const Gambit::BehaviorSupportProfile &big_supp)
 {
-  // This asks whether there is a Nash extension of the Gambit::MixedBehavProfile<double> to 
+  // This asks whether there is a Nash extension of the Gambit::MixedBehaviorProfile<double> to 
   // all information sets at which the behavioral probabilities are not
   // specified.  The assumption is that the support has active actions
   // at infosets at which the behavioral probabilities are defined, and
@@ -417,11 +417,11 @@ bool algExtendsToNash::ExtendsToNash(const Gambit::MixedBehavProfile<double> &p_
 //                   class algExtendsToAgentNash
 //=========================================================================
 
-static bool ANFNodeProbabilityPoly(const Gambit::MixedBehavProfile<double> &p_solution,
+static bool ANFNodeProbabilityPoly(const Gambit::MixedBehaviorProfile<double> &p_solution,
 				   gPoly<double> & node_prob,
 				   const gSpace &BehavStratSpace, 
 				   const term_order &Lex,
-				   const Gambit::BehavSupport &big_supp,
+				   const Gambit::BehaviorSupportProfile &big_supp,
 				   const Gambit::List<Gambit::List<int> > &var_index,
 				   Gambit::GameNode tempnode,
 				   const int &pl,
@@ -468,11 +468,11 @@ static bool ANFNodeProbabilityPoly(const Gambit::MixedBehavProfile<double> &p_so
 }
 
 static gPolyList<double> 
-ANFExpectedPayoffDiffPolys(const Gambit::MixedBehavProfile<double> &p_solution,
+ANFExpectedPayoffDiffPolys(const Gambit::MixedBehaviorProfile<double> &p_solution,
 			   const gSpace &BehavStratSpace, 
 			   const term_order &Lex,
-			   const Gambit::BehavSupport &little_supp,
-			   const Gambit::BehavSupport &big_supp,
+			   const Gambit::BehaviorSupportProfile &little_supp,
+			   const Gambit::BehaviorSupportProfile &big_supp,
 			   const Gambit::List<Gambit::List<int> > &var_index)
 {
   gPolyList<double> answer(&BehavStratSpace, &Lex);
@@ -514,11 +514,11 @@ ANFExpectedPayoffDiffPolys(const Gambit::MixedBehavProfile<double> &p_solution,
 }
 
 static gPolyList<double> 
-ExtendsToANFNashIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
+ExtendsToANFNashIneqs(const Gambit::MixedBehaviorProfile<double> &p_solution,
 		      const gSpace &BehavStratSpace, 
 		      const term_order &Lex,
-		      const Gambit::BehavSupport &little_supp,
-		      const Gambit::BehavSupport &big_supp,
+		      const Gambit::BehaviorSupportProfile &little_supp,
+		      const Gambit::BehaviorSupportProfile &big_supp,
 		      const Gambit::List<Gambit::List<int> > &var_index)
 {
   gPolyList<double> answer(&BehavStratSpace, &Lex);
@@ -534,11 +534,11 @@ ExtendsToANFNashIneqs(const Gambit::MixedBehavProfile<double> &p_solution,
   return answer;
 }
 
-bool algExtendsToAgentNash::ExtendsToAgentNash(const Gambit::MixedBehavProfile<double> &p_solution,
-					       const Gambit::BehavSupport &little_supp,
-					       const Gambit::BehavSupport &big_supp)
+bool algExtendsToAgentNash::ExtendsToAgentNash(const Gambit::MixedBehaviorProfile<double> &p_solution,
+					       const Gambit::BehaviorSupportProfile &little_supp,
+					       const Gambit::BehaviorSupportProfile &big_supp)
 {
-  // This asks whether there is an ANF Nash extension of the Gambit::MixedBehavProfile<double> to 
+  // This asks whether there is an ANF Nash extension of the Gambit::MixedBehaviorProfile<double> to 
   // all information sets at which the behavioral probabilities are not
   // specified.  The assumption is that the support has active actions
   // at infosets at which the behavioral probabilities are defined, and

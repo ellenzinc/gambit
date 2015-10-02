@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/game.h
 // Declaration of base class for representing games
@@ -123,61 +123,26 @@ public:
   bool operator!(void) const { return !rep; }
 };
 
-/// A constant forward iterator on an array of GameObjects
-template <class R, class T> class GameObjectIterator {
-private:
-  const Array<R *> &m_array;
-  int m_index;
-
-public:
-  /// @name Lifecycle
-  //@{
-  /// Constructor
-  GameObjectIterator(const Array<R *> &p_array)
-    : m_array(p_array), m_index(m_array.First()) { }
-  //@}
-
-  /// @name Iteration and data access
-  //@{
-  /// Advance to the next element (prefix version)
-  void operator++(void) { m_index++; }
-  /// Advance to the next element (postfix version)
-  void operator++(int) { m_index++; }
-  /// Has iterator gone past the end?
-  bool AtEnd(void) const { return m_index > m_array.Last(); }
-  /// Get the current index into the array
-  int GetIndex(void) const { return m_index; }
-
-  /// Get the current element
-    ///T operator*(void) const { return m_array[m_index]; }
-  /// Get the current element
-  T operator->(void) const { return m_array[m_index]; }
-  /// Get the current element
-  operator T(void) const { return m_array[m_index]; }
-  //@}
-};
-
-
 //
 // Forward declarations of classes defined in this file.
 //
 
+class GameOutcomeRep;
+typedef GameObjectPtr<GameOutcomeRep> GameOutcome;
+
 class GameActionRep;
 typedef GameObjectPtr<GameActionRep> GameAction;
-typedef GameObjectIterator<GameActionRep, GameAction> GameActionIterator;
 
 class GameInfosetRep;
 typedef GameObjectPtr<GameInfosetRep> GameInfoset;
-typedef GameObjectIterator<GameInfosetRep, GameInfoset> GameInfosetIterator;
 class GameTreeInfosetRep;
 
 class GameStrategyRep;
 typedef GameObjectPtr<GameStrategyRep> GameStrategy;
-typedef GameObjectIterator<GameStrategyRep, GameStrategy> GameStrategyIterator;
 
 class GamePlayerRep;
 typedef GameObjectPtr<GamePlayerRep> GamePlayer;
-typedef GameObjectIterator<GamePlayerRep, GamePlayer> GamePlayerIterator;
+typedef Array<GamePlayerRep *> GamePlayers;
 
 class GameNodeRep;
 typedef GameObjectPtr<GameNodeRep> GameNode;
@@ -187,14 +152,15 @@ class GameRep;
 typedef GameObjectPtr<GameRep> Game;
 
 class PureStrategyProfileRep;
-typedef std::auto_ptr<PureStrategyProfileRep> PureStrategyProfile;
+class PureStrategyProfile;
+
 
 // 
 // Forward declarations of classes defined elsewhere.
 //
 template <class T> class MixedStrategyProfile;
-template <class T> class MixedBehavProfile;
-class StrategySupport;
+template <class T> class MixedBehaviorProfile;
+class StrategySupportProfile;
 
 //=======================================================================
 //         Exceptions thrown from game representation classes
@@ -203,8 +169,9 @@ class StrategySupport;
 /// Exception thrown when an operation that is undefined is attempted
 class UndefinedException : public Exception {
 public:
+  UndefinedException(void) : Exception("Undefined operation on game") { }
+  UndefinedException(const std::string &s) : Exception(s) { }
   virtual ~UndefinedException() throw() { }
-  const char *what(void) const throw()   { return "Undefined operation on game"; }
 };
 
 /// Exception thrown on an operation between incompatible objects
@@ -219,7 +186,7 @@ public:
 class InvalidFileException : public Exception {
 public:
   InvalidFileException(void) : Exception("File not in a recognized format") { }
-  InvalidFileException(const char *s) : Exception(s) { }
+  InvalidFileException(const std::string &s) : Exception(s) { } 
   virtual ~InvalidFileException() throw() { }
 };
 
@@ -243,6 +210,7 @@ private:
   int m_number;
   std::string m_label;
   Array<Number> m_payoffs;
+  GameOutcome m_unrestricted;
 
   /// @name Lifecycle
   //@{
@@ -273,6 +241,10 @@ public:
     m_payoffs[pl] = p_value;
     //m_game->ClearComputedValues();
   }
+
+  /// Map the outcome to the corresponding outcome in the unrestricted game
+  GameOutcome Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
   //@}
 };
 
@@ -281,6 +253,9 @@ typedef GameObjectPtr<GameOutcomeRep> GameOutcome;
 /// An action at an information set in an extensive game
 class GameActionRep : public GameObject {
 protected:
+  GameAction m_unrestricted;
+
+  GameActionRep(void) : m_unrestricted(0) { }
   virtual ~GameActionRep() { }
 
 public:
@@ -293,11 +268,19 @@ public:
   virtual bool Precedes(const GameNode &) const = 0;
 
   virtual void DeleteAction(void) = 0;
+
+  /// Map the action to the corresponding action in the unrestricted game
+  GameAction Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
+
 };
 
 /// An information set in an extensive game
 class GameInfosetRep : public GameObject {
 protected:
+  GameInfoset m_unrestricted;
+ 
+  GameInfosetRep(void): m_unrestricted(0) { }
   virtual ~GameInfosetRep() { }
 
 public:
@@ -334,6 +317,10 @@ public:
   virtual Rational GetActionProb(int pl, const Rational &) const = 0;
   virtual std::string GetActionProb(int pl, const std::string &) const = 0;
   virtual void Reveal(GamePlayer) = 0;
+
+  /// Map the infoset to the corresponding infoset in the unrestricted game
+  GameInfoset Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
 };
 
 /// \brief A strategy in a game.
@@ -350,13 +337,15 @@ class GameStrategyRep : public GameObject  {
   friend class GameTreeRep;
   friend class GameTableRep;
   friend class GameAggRep;
+  friend class GameBagentRep;
   friend class GamePlayerRep;
   friend class PureStrategyProfileRep;
   friend class TreePureStrategyProfileRep;
   friend class TablePureStrategyProfileRep;
+  friend class StrategySupportProfile;
   template <class T> friend class MixedStrategyProfile;
   template <class T> friend class TableMixedStrategyProfileRep;
-  template <class T> friend class MixedBehavProfile;
+  template <class T> friend class MixedBehaviorProfile;
 
 private:
   int m_number, m_id;
@@ -364,12 +353,13 @@ private:
   long m_offset;
   std::string m_label;
   Array<int> m_behav;
+  GameStrategy m_unrestricted;
 
   /// @name Lifecycle
   //@{
   /// Creates a new strategy for the given player.
   GameStrategyRep(GamePlayerRep *p_player)
-    : m_number(0), m_id(0), m_player(p_player), m_offset(0L) { }
+    : m_number(0), m_id(0), m_player(p_player), m_offset(0L), m_unrestricted(0) { }
   //@}
 
 public:
@@ -389,8 +379,14 @@ public:
 
   /// Remove this strategy from the game
   void DeleteStrategy(void);
+
+  /// Map the strategy to the corresponding strategy in the unrestricted game
+  GameStrategy Unrestrict(void) const
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
   //@}
 };
+
+typedef Array<GameStrategyRep *> GameStrategyArray;
 
 /// A player in a game
 class GamePlayerRep : public GameObject {
@@ -398,10 +394,13 @@ class GamePlayerRep : public GameObject {
   friend class GameTreeRep;
   friend class GameTableRep;
   friend class GameAggRep;
+  friend class GameBagentRep;
+  friend class GameBaggRep;
   friend class GameTreeInfosetRep;
   friend class GameStrategyRep;
   friend class GameTreeNodeRep;
-  template <class T> friend class MixedBehavProfile;
+  friend class StrategySupportProfile;
+  template <class T> friend class MixedBehaviorProfile;
   template <class T> friend class MixedStrategyProfile;
 
   /// @name Building reduced form strategies
@@ -415,10 +414,11 @@ private:
   int m_number;
   std::string m_label;
   Array<GameTreeInfosetRep *> m_infosets;
-  Array<GameStrategyRep *> m_strategies;
+  GameStrategyArray m_strategies;
+  GamePlayer m_unrestricted;
 
-  GamePlayerRep(GameRep *p_game, int p_id) : m_game(p_game), m_number(p_id)
-    { }
+  GamePlayerRep(GameRep *p_game, int p_id) 
+    : m_game(p_game), m_number(p_id), m_unrestricted(0) { }
   GamePlayerRep(GameRep *p_game, int p_id, int m_strats);
   ~GamePlayerRep();
 
@@ -444,16 +444,24 @@ public:
   int NumStrategies(void) const; 
   /// Returns the st'th strategy for the player
   GameStrategy GetStrategy(int st) const;
-  /// Returns a forward iterator over the strategies
-  GameStrategyIterator Strategies(void) const; 
+  /// Returns the array of strategies available to the player
+  const GameStrategyArray &Strategies(void) const;
   /// Creates a new strategy for the player
   GameStrategy NewStrategy(void);
   //@}
+
+  /// Map the player to the corresponding player in the unrestricted game
+  GamePlayer Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
+
 };
 
 /// A node in an extensive game
 class GameNodeRep : public GameObject {
 protected:
+  GameNode m_unrestricted;
+
+  GameNodeRep(void) : m_unrestricted(0) { }
   virtual ~GameNodeRep() { }
 
 public:
@@ -498,27 +506,35 @@ public:
   virtual GameInfoset AppendMove(GameInfoset p_infoset) = 0;
   virtual GameInfoset InsertMove(GamePlayer p_player, int p_actions) = 0;
   virtual GameInfoset InsertMove(GameInfoset p_infoset) = 0;
+
+  /// Map the node to the corresponding node in the unrestricted game
+  GameNode Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
 };
 
 
 /// This class represents a strategy profile on a strategic game.
 /// It specifies exactly one strategy for each player defined on the
 /// game.
-class PureStrategyProfileRep : public GameObject {
+class PureStrategyProfileRep {
   friend class GameTableRep;
   friend class GameTreeRep;
   friend class GameAggRep;
+  friend class PureStrategyProfile;
 
 protected:
   Game m_nfg;
   Array<GameStrategy> m_profile;
 
   /// Construct a new strategy profile
-  PureStrategyProfileRep(void) { }
+  PureStrategyProfileRep(const Game &p_game);
+
+  /// Create a copy of the strategy profile.
+  /// Caller is responsible for memory management of the created object.
+  virtual PureStrategyProfileRep *Copy(void) const = 0;
 
 public:
   virtual ~PureStrategyProfileRep() { }
-  virtual PureStrategyProfile Copy(void) const = 0;
   
   /// @name Data access and manipulation
   //@{
@@ -544,13 +560,55 @@ public:
   { return GetPayoff(p_player->GetNumber()); }
   /// Get the value of playing strategy against the profile
   virtual Rational GetStrategyValue(const GameStrategy &) const = 0;
+
+  /// Is the profile a pure strategy Nash equilibrium?
+  bool IsNash(void) const;
+
+  /// Is the profile a strict pure stategy Nash equilibrium?
+  bool IsStrictNash(void) const;
+
+  /// Is the specificed player playing a best response?
+  bool IsBestResponse(const GamePlayer &p_player) const;
+
+  /// Get the list of best response strategies for a player
+  List<GameStrategy> GetBestResponse(const GamePlayer &p_player) const;
+
+  /// Convert to a mixed strategy representation
+  MixedStrategyProfile<Rational> ToMixedStrategyProfile(void) const;
+
+  /// Map strategy profile to the unrestriction of the game
+  PureStrategyProfile Unrestrict(void) const;
+
   //@}
 };
+
+class PureStrategyProfile {
+private:
+  PureStrategyProfileRep *rep;
+
+public:
+  PureStrategyProfile(const PureStrategyProfile &r) : rep(r.rep->Copy())  { }
+  PureStrategyProfile(PureStrategyProfileRep *p_rep) : rep(p_rep) { }
+  ~PureStrategyProfile() { delete rep; }
+
+  PureStrategyProfile &operator=(const PureStrategyProfile &r) 
+    {
+      if (&r != this) {
+	delete rep;
+	rep = r.rep->Copy();
+      }
+      return *this;
+    }
+
+  PureStrategyProfileRep *operator->(void) const { return rep; }
+  operator PureStrategyProfileRep *(void) const { return rep; }
+};
+    
 
 /// This class represents a behavior profile on an extensive game.
 /// It specifies exactly one strategy for each information set in the
 /// game.
-class PureBehavProfile {
+class PureBehaviorProfile {
 private:
   Game m_efg;
   Array<Array<GameAction> > m_profile;
@@ -559,7 +617,7 @@ public:
   /// @name Lifecycle
   //@{
   /// Construct a new behavior profile on the specified game
-  PureBehavProfile(Game);
+  PureBehaviorProfile(Game);
 
   /// @name Data access and manipulation
   //@{
@@ -578,6 +636,12 @@ public:
   template <class T> T GetPayoff(const GameNode &, int pl) const;
   /// Get the payoff to playing the action, conditional on the profile
   template <class T> T GetPayoff(const GameAction &) const;
+
+  /// Is the profile a pure strategy agent Nash equilibrium?
+  bool IsAgentNash(void) const;
+
+  /// Convert to a mixed behavior representation
+  MixedBehaviorProfile<Rational> ToMixedBehaviorProfile(void) const;
   //@}
 };
 
@@ -589,7 +653,7 @@ class GameRep : public GameObject {
   friend class GameTreeNodeRep;
   friend class PureStrategyProfileRep;
   friend class TablePureStrategyProfileRep;
-  template <class T> friend class MixedBehavProfile;
+  template <class T> friend class MixedBehaviorProfile;
   template <class T> friend class MixedStrategyProfile;
   template <class T> friend class TableMixedStrategyProfileRep;
 
@@ -627,6 +691,11 @@ public:
 
   /// Returns true if the game has a action-graph game representation
   virtual bool IsAgg(void) const { return false; }
+
+  /// Returns true if the game is a restriction of a more general game
+  virtual bool IsRestriction(void) const { return false; }
+  /// Returns the unrestricted version of the game
+  virtual Game Unrestrict(void) const { throw UndefinedException(); }
 
   /// Get the text label associated with the game
   virtual const std::string &GetTitle(void) const { return m_title; }
@@ -682,8 +751,8 @@ public:
   virtual PureStrategyProfile NewPureStrategyProfile(void) const = 0;
   virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double) const = 0;
   virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &) const = 0; 
-  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupport&) const = 0;
-  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupport&) const = 0;
+  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupportProfile&) const = 0;
+  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupportProfile&) const = 0;
 
   /// @name Players
   //@{
@@ -691,8 +760,8 @@ public:
   virtual int NumPlayers(void) const = 0;
   /// Returns the pl'th player in the game
   virtual GamePlayer GetPlayer(int pl) const = 0;
-  /// Returns an iterator over the players
-  virtual GamePlayerIterator Players(void) const = 0;
+  /// Returns the set of players in the game 
+  virtual const GamePlayers &Players(void) const = 0;
   /// Returns the chance (nature) player
   virtual GamePlayer GetChance(void) const = 0;
   /// Creates a new player in the game, with no moves
@@ -753,16 +822,16 @@ inline int GamePlayerRep::NumStrategies(void) const
 { m_game->BuildComputedValues(); return m_strategies.Length(); }
 inline GameStrategy GamePlayerRep::GetStrategy(int st) const 
 { m_game->BuildComputedValues(); return m_strategies[st]; }
-inline GameStrategyIterator GamePlayerRep::Strategies(void) const 
-{ m_game->BuildComputedValues(); return GameStrategyIterator(m_strategies); }
+inline const GameStrategyArray &GamePlayerRep::Strategies(void) const
+{ m_game->BuildComputedValues(); return m_strategies; }
 
-template<> inline double PureBehavProfile::GetPayoff(int pl) const
+template<> inline double PureBehaviorProfile::GetPayoff(int pl) const
 { return GetPayoff<double>(m_efg->GetRoot(), pl); }
 
-template<> inline Rational PureBehavProfile::GetPayoff(int pl) const
+template<> inline Rational PureBehaviorProfile::GetPayoff(int pl) const
 { return GetPayoff<Rational>(m_efg->GetRoot(), pl); }
 
-template<> inline std::string PureBehavProfile::GetPayoff(int pl) const
+template<> inline std::string PureBehaviorProfile::GetPayoff(int pl) const
 { return lexical_cast<std::string>(GetPayoff<Rational>(m_efg->GetRoot(), pl)); }
 
 //=======================================================================

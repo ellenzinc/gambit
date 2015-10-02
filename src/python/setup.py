@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/setup.py
 # Setuptools configuration file for Gambit Python extension
@@ -36,12 +36,22 @@ libgame = Extension("gambit.lib.libgambit",
                     sources=[ "gambit/lib/libgambit.pyx" ] +
                             glob.glob("gambit/lib/*.pxi") +
                             glob.glob("../libgambit/*.cc") +
-                            glob.glob("../libagg/*.cc"),
+                            glob.glob("../libagg/*.cc") +
+                            glob.glob("../liblinear/*.cc") +
+                            [ "../tools/lcp/nfglcp.cc",
+                              "../tools/lcp/efglcp.cc",
+                              "../tools/lcp/lhtab.cc",
+                              "../tools/lcp/lemketab.cc",
+                              "../tools/lp/nfglp.cc",
+                              "../tools/lp/efglp.cc",
+                              "../tools/logit/path.cc",
+                              "../tools/logit/nfglogit.cc",
+                              "../tools/logit/efglogit.cc" ],
                     language="c++",
-                    include_dirs=[ ".." ] )
+                    include_dirs=[ "../..", ".." ] )
 
 setup(name="gambit",
-      version="14.0.0",
+      version="15.0.0",
       description="Software tools for game theory",
       author="Theodore Turocy",
       author_email="ted.turocy@gmail.com",

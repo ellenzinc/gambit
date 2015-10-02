@@ -13,14 +13,27 @@ The graphical interface also provides a frontend for calling these
 programs and evaluating their output.  Direct use of the command-line
 programs is intended for advanced users and applications.
 
-These programs take an extensive or strategic game file
-on standard input, and output a list of equilibria computed. The
-equilibria computed are presented as a list of comma-separated
-probabilities, preceded by the tag "NE". Many of the programs
-optionally output additional information about the operation of the
-algorithm.  These outputs have other, program-specific tags, described
-in the individual program documentation.
+These programs take an extensive or strategic game file, which can be
+specified on the command line or piped via standard input, and output
+a list of equilibria computed. The default output format is to present
+equilibria computed as a list of comma-separated probabilities,
+preceded by the tag `NE`. For mixed strategy profiles, the
+probabilities are sorted lexicographically by player, then by
+strategy.  For behavior strategy profiles, the probabilites are sorted
+by player, then information set, then action number, where the
+information sets for a player are sorted by the order in which they
+are encountered in a depth-first traversal of the game tree.
+Many programs take an option `-D`, which, if specified, instead prints
+a more verbose, human-friendly description of each strategy profile
+computed.
 
+Many of the programs optionally output additional information
+about the operation of the algorithm.  These outputs have other,
+program-specific tags, described in the individual program
+documentation.
+
+
+.. _gambit-enumpure:
 
 :program:`gambit-enumpure`: Enumerate pure-strategy equilibria of a game
 ------------------------------------------------------------------------
@@ -28,15 +41,42 @@ in the individual program documentation.
 :program:`gambit-enumpure` reads a game on standard input and searches for
 pure-strategy Nash equilibria.
 
+.. versionchanged:: 14.0.2
+   The effect of the `-S` switch is now purely cosmetic, determining
+   how the equilibria computed are represented in the
+   output. Previously, `-S` computed using the strategic game; if this
+   was not specified for an extensive game, the agent form equilibria
+   were returned.
 
 .. program:: gambit-enumpure
 
 .. cmdoption:: -S
 
-   By default, the program uses behavior strategies for extensive
-   games; this switch instructs the program to use reduced strategic game
-   strategies for extensive games. (This has no effect for strategic
-   games, since a strategic game is its own reduced strategic game.)
+   Report equilibria in reduced strategic form strategies, even if the
+   game is an extensive game.  By default, if passed an extensive
+   game, the output will be in behavior strategies.  Specifying this switch
+   does not imply any change in operation internally, as pure-strategy
+   equilibria are defined in terms of reduced strategic form
+   strategies.
+
+.. cmdoption:: -D
+
+   .. versionadded:: 14.0.2
+
+   The default output format for computed equilibria is a
+   comma-separated list of strategy or action probabilities, suitable
+   for postprocessing by automated tools.  Specifying `-D` instead
+   causes the program to output greater detail on each equilbrium
+   profile computed.
+
+.. cmdoption:: -A
+
+   .. versionadded:: 14.0.2
+
+   Report agent form equilibria, that is, equilibria which consider
+   only deviations at one information set.  Only has an effect for
+   extensive games, as strategic games have only one information set
+   per player.
 
 .. cmdoption:: -P
 
@@ -55,11 +95,35 @@ pure-strategy Nash equilibria.
    Suppresses printing of the banner at program launch.
 
 
-Example invocation::
+Computing the pure-strategy equilibria of extensive game :download:`e02.efg
+<../contrib/games/e02.efg>`, the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
 
-   $ gambit-enumpure < e02.efg
+   $ gambit-enumpure e02.efg
    Search for Nash equilibria in pure strategies
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
+   This is free software, distributed under the GNU GPL
+
+   NE,1,0,0,0,1,0
+
+With the `-S` switch, the set of equilibria returned is the same,
+except expressed in strategic game strategies rather than behavior
+strategies::
+
+   $ gambit-enumpure -S e02.efg
+   Search for Nash equilibria in pure strategies
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
+   This is free software, distributed under the GNU GPL
+
+   NE,1,0,0,1,0
+
+The `-A` switch considers only behavior strategy profiles where there
+is no way for a player to improve his payoff by changing action at
+only one information set; therefore the set of solutions is larger::
+
+   $ gambit-enumpure -A e02.efg   
+   Search for Nash equilibria in pure strategies
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE,1,0,1,0,1,0
@@ -138,11 +202,14 @@ singular supports.
    singular supports are identified with the label "singular." By
    default, no information about supports is printed.
 
-Example invocation::
+Computing equilbria of the extensive game :download:`e01.efg
+<../contrib/games/e01.efg>`, the example in Figure 1 of Selten
+(International Journal of Game Theory, 1975) sometimes called
+"Selten's horse"::
 
-   $ gambit-enumpoly < e01.efg 
+   $ gambit-enumpoly e01.efg 
    Compute Nash equilibria by solving polynomial systems
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    Heuristic search implementation Copyright (C) 2006, Litao Wei 
    This is free software, distributed under the GNU GPL
 
@@ -217,11 +284,14 @@ points.
    to carry out the enumeration process.  This is an experimental
    feature that has not been widely tested.
 
-Example invocation::
+Computing the equilibria, in mixed strategies, of :download:`e02.nfg
+<../contrib/games/e02.nfg>`, the reduced strategic form of the example
+in Figure 2 of Selten (International Journal of Game Theory,
+1975)::
 
-   $ gambit-enummixed < e02.nfg
+   $ gambit-enummixed e02.nfg
    Compute Nash equilibria by enumerating extreme points
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    Enumeration code based on lrslib 4.2b, 
    Copyright (C) 1995-2005 by David Avis (avis@cs.mcgill.ca)
    This is free software, distributed under the GNU GPL
@@ -233,9 +303,9 @@ In fact, the game e02.nfg has a one-dimensional continuum of
 equilibria.  This fact can be observed by examining the connectedness
 information using the `-c` switch::
   
-   $ gambit-enummixed -c < ../contrib/games/e02.nfg
+   $ gambit-enummixed -c e02.nfg
    Compute Nash equilibria by enumerating extreme points
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    Enumeration code based on lrslib 4.2b, 
    Copyright (C) 1995-2005 by David Avis (avis@cs.mcgill.ca)
    This is free software, distributed under the GNU GPL
@@ -288,12 +358,14 @@ implementation by Ben Blum and Christian Shelton.
    Show intermediate output of the algorithm.  If this option is
    not specified, only the equilibria found are reported.
 
-Example invocation::
+Computing an equilibrium of :download:`e02.nfg <../contrib/games/e02.nfg>`,
+the reduced strategic form of the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
 
-    $ gambit-gnm < e02.nfg
+    $ gambit-gnm e02.nfg
     Compute Nash equilibria using a global Newton method
     Gametracer version 0.2, Copyright (C) 2002, Ben Blum and Christian Shelton
-    Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+    Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
     This is free software, distributed under the GNU GPL
 
     NE,1,0,2.99905e-12,0.5,0.5
@@ -336,12 +408,14 @@ implementation by Ben Blum and Christian Shelton.
    Suppresses printing of the banner at program launch.
 
 
-Example invocation::
-
-   $ gambit-ipa < e02.nfg
+Computing an equilibrium of :download:`e02.nfg <../contrib/games/e02.nfg>`,
+the reduced strategic form of the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
+ 
+   $ gambit-ipa e02.nfg
    Compute Nash equilibria using iterated polymatrix approximation
    Gametracer version 0.2, Copyright (C) 2002, Ben Blum and Christian Shelton
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE,1.000000,0.000000,0.000000,1.000000,0.000000
@@ -400,6 +474,16 @@ game.
    strategies for extensive games. (This has no effect for strategic
    games, since a strategic game is its own reduced strategic game.)
 
+.. cmdoption:: -D
+
+   .. versionadded:: 14.0.2
+
+   The default output format for computed equilibria is a
+   comma-separated list of strategy or action probabilities, suitable
+   for postprocessing by automated tools.  Specifying `-D` instead
+   causes the program to output greater detail on each equilbrium
+   profile computed.
+
 .. cmdoption:: -P
 
    By default, the program computes Nash equilibria in an extensive
@@ -416,16 +500,19 @@ game.
    Suppresses printing of the banner at program launch.
 
 
-Example invocation::
+Computing an equilibrium of extensive game :download:`e02.efg
+<../contrib/games/e02.efg>`, the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
 
-   $ gambit-lcp < e02.efg
+   $ gambit-lcp e02.efg
    Compute Nash equilibria by solving a linear complementarity program
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE,1,0,1/2,1/2,1/2,1/2
 
 
+.. _gambit-lp:
 
 :program:`gambit-lp`: Compute equilibria in a two-player constant-sum game via linear programming
 -------------------------------------------------------------------------------------------------
@@ -461,6 +548,23 @@ points of that set.
    strategies for extensive games. (This has no effect for strategic
    games, since a strategic game is its own reduced strategic game.)
 
+.. cmdoption:: -D
+
+   .. versionadded:: 14.0.3
+
+   The default output format for computed equilibria is a
+   comma-separated list of strategy or action probabilities, suitable
+   for postprocessing by automated tools.  Specifying `-D` instead
+   causes the program to output greater detail on each equilbrium
+   profile computed.
+
+.. cmdoption:: -P
+
+   By default, the program computes Nash equilibria in an extensive
+   game. This switch instructs the program to find only equilibria
+   which are subgame perfect.  (This has no effect for strategic
+   games, since there are no proper subgames of a strategic game.)
+
 .. cmdoption:: -h
 
    Prints a help message listing the available options.
@@ -469,11 +573,13 @@ points of that set.
 
    Suppresses printing of the banner at program launch.
 
-Example invocation::
+Computing an equilibrium of the game :download:`2x2const.nfg
+<../contrib/games/2x2const.nfg>`, a game with two players with two
+strategies each, with a unique equilibrium in mixed strategies::
 
-   $ gambit-lp < 2x2const.nfg
+   $ gambit-lp 2x2const.nfg
    Compute Nash equilibria by solving a linear program
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE,1/3,2/3,1/3,2/3
@@ -534,11 +640,13 @@ not guaranteed to find all, or even any, Nash equilibria.
    that is not a Nash equilibrium, are all output, in addition to any
    equilibria found.
 
-Example invocation::
+Computing an equilibrium in mixed strategies of :download:`e02.efg
+<../contrib/games/e02.efg>`, the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
 
-   $ gambit-liap < ../contrib/games/e02.nfg
+   $ gambit-liap e02.nfg
    Compute Nash equilibria by minimizing the Lyapunov function
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE, 0.998701, 0.000229, 0.001070, 0.618833, 0.381167
@@ -570,14 +678,6 @@ attempt to compute other equilibria that may exist, use the
 options to specify additional starting points for the algorithm.
 
 .. program:: gambit-simpdiv
-
-.. cmdoption:: -d
-
-   Express all output using decimal representations
-   with DECIMALS digits. Because the algorithm is based on a grid, this
-   algorithm inherently computes using rational numbers. By default,
-   these rational probabilities are output. Expressing the profile
-   probabilities as decimal numbers may make reading the output easier.
 
 .. cmdoption:: -g
 
@@ -622,11 +722,13 @@ options to specify additional starting points for the algorithm.
    in addition to the approximate equilibrium profile found.
 
 
-Example invocation::
-
-   $ gambit-simpdiv < e02.nfg 
+Computing an equilibrium in mixed strategies of :download:`e02.efg
+<../contrib/games/e02.efg>`, the example in Figure 2 of Selten
+(International Journal of Game Theory, 1975)::
+ 
+   $ gambit-simpdiv e02.nfg 
    Compute Nash equilibria using simplicial subdivision
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    NE,1,0,0,1,0
@@ -719,11 +821,14 @@ phase for large values of the precision parameter lambda.
    this switch is specified, only the approximation to the Nash
    equilibrium at the end of the branch is output.
 
-Example invocation::
+Computing the principal branch, in mixed strategies, of :download:`e02.nfg
+<../contrib/games/e02.nfg>`, the reduced strategic form of the example
+in Figure 2 of Selten (International Journal of Game Theory,
+1975)::
 
-   $ gambit-logit < e02.nfg
+   $ gambit-logit e02.nfg
    Compute a branch of the logit equilibrium correspondence
-   Gambit version 14.0.0, Copyright (C) 1994-2013, The Gambit Project
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
    This is free software, distributed under the GNU GPL
 
    0.000000,0.333333,0.333333,0.333333,0.5,0.5
@@ -740,3 +845,71 @@ Example invocation::
    890093.921767,1,0,3.05596e-11,0.500014,0.499986
    979103.323545,1,0,2.54469e-11,0.500012,0.499988
    1077013.665501,1,0,2.11883e-11,0.500011,0.499989
+
+
+:program:`gambit-convert`: Convert games among various representations
+----------------------------------------------------------------------
+
+:program:`gambit-convert` reads a game on standard input in any supported format
+and converts it to another text representation.  Currently, this tool supports
+outputting the strategic form of the game in one of these formats:
+
+* A standard HTML table.
+* A LaTeX fragment in the format of Martin Osborne's `sgame` macros
+  (see http://www.economics.utoronto.ca/osborne/latex/index.html).
+
+
+.. program:: gambit-convert
+
+.. cmdoption:: -O FORMAT
+
+   Required.  Specifies the output format.  Supported options for
+   `FORMAT` are `html` or `sgame`.
+
+.. cmdoption:: -r PLAYER
+
+   Specifies the player number to place on the rows of the tables.
+   The default if not specified is to place player 1 on the rows.
+
+.. cmdoption:: -c PLAYER
+
+   Specifies the player number to place on the columns of the tables.
+   The default if not specified is to place player 2 on the columns.
+
+.. cmdoption:: -h
+
+   Prints a help message listing the available options.
+
+.. cmdoption:: -q
+
+   Suppresses printing of the banner at program launch.
+
+
+Example invocation for HTML output::
+
+   $ gambit-convert -O html 2x2.nfg
+   Convert games among various file formats
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
+   This is free software, distributed under the GNU GPL
+
+   <center><h1>Two person 2 x 2 game with unique mixed equilibrium</h1></center>
+   <table><tr><td></td><td align=center><b>1</b></td><td  
+   align=center><b>2</b></td></tr><tr><td align=center><b>1</b></td><td 
+   align=center>2,0</td><td align=center>0,1</td></tr><tr><td   
+   align=center><b>2</b></td><td align=center>0,1</td><td 
+   align=center>1,0</td></tr></table>
+
+
+Example invocation for LaTeX output::
+
+   $ gambit-convert -O sgame 2x2.nfg
+   Convert games among various file formats
+   Gambit version 15.0.0, Copyright (C) 1994-2014, The Gambit Project
+   This is free software, distributed under the GNU GPL
+
+   \begin{game}{2}{2}[Player 1][Player 2]
+   &1 & 2\\
+   1 &  $2,0$  &  $0,1$ \\
+   2 &  $0,1$  &  $1,0$ 
+   \end{game}
+

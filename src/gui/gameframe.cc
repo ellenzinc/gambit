@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/gui/gameframe.cc
 // Implementation of frame containing views of a game
@@ -1003,7 +1003,8 @@ void gbtGameFrame::OnFileExportGraphic(wxCommandEvent &p_event)
     case GBT_MENU_FILE_EXPORT_BMP:  code = wxBITMAP_TYPE_BMP;  break;
     case GBT_MENU_FILE_EXPORT_JPEG: code = wxBITMAP_TYPE_JPEG; break;
     case GBT_MENU_FILE_EXPORT_PNG:  code = wxBITMAP_TYPE_PNG;  break;
-    default: break;
+    default:   return;
+
     }
 
     if (!bitmap.SaveFile(dialog.GetPath(), code)) {
@@ -1310,14 +1311,13 @@ void gbtGameFrame::OnViewStrategic(wxCommandEvent &p_event)
 {
   if (m_efgPanel->IsShown()) {
     // We are switching to strategic view
-
     if (!m_doc->GetGame()->IsPerfectRecall()) {
-      if (wxMessageBox(wxT("This is not a game of perfect recall\n")
-			 wxT("Do you wish to continue?"), 
-		       _("Strategic game"), 
-		       wxOK | wxCANCEL | wxALIGN_CENTER, this) != wxOK) {
-	return;
-      }
+      wxMessageBox(wxT("This is not a game of perfect recall.\n")
+		   wxT("Computing the reduced strategic representation ")
+		   wxT("of this game is not supported."),
+		   wxT("Show strategic game"),
+		   wxOK);
+      return;
     }
     
     int ncont = m_doc->GetGame()->NumStrategyContingencies();
@@ -1438,6 +1438,15 @@ void gbtGameFrame::OnToolsDominance(wxCommandEvent &p_event)
 
 void gbtGameFrame::OnToolsEquilibrium(wxCommandEvent &)
 {
+  if (!m_doc->GetGame()->IsPerfectRecall()) {
+    wxMessageBox(wxT("This is not a game of perfect recall.\n")
+		 wxT("Computing Nash equilibria of this game ")
+		 wxT("is not supported."),
+		 wxT("Show strategic game"),
+		 wxOK);
+    return;
+  }
+  
   gbtNashChoiceDialog dialog(this, m_doc);
 
   if (dialog.ShowModal() == wxID_OK) {
@@ -1478,6 +1487,15 @@ extern void LogitStrategic(wxWindow *, gbtGameDocument *);
 
 void gbtGameFrame::OnToolsQre(wxCommandEvent &)
 {
+  if (!m_doc->GetGame()->IsPerfectRecall()) {
+    wxMessageBox(wxT("This is not a game of perfect recall.\n")
+		 wxT("Computing quantal response equilibria of this game ")
+		 wxT("is not supported."),
+		 wxT("Show strategic game"),
+		 wxOK);
+    return;
+  }
+
   if (m_efgPanel && m_splitter->GetWindow1() == m_efgPanel) {
     gbtLogitBehavDialog(this, m_doc).ShowModal();
   }

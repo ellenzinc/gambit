@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/game.pxi
 # Cython wrapper for games
@@ -19,6 +19,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #
+import itertools
+
 from libcpp cimport bool
 from gambit.lib.error import UndefinedOperationError
 import gambit.gte
@@ -117,8 +119,58 @@ cdef class GameStrategies(Collection):
         s.strategy = self.game.deref().GetStrategy(st+1)
         return s
 
-cdef class Game:
+cdef class Game(object):
     cdef c_Game game
+
+    @classmethod
+    def new_tree(cls):
+        cdef Game g
+        g = cls()
+        g.game = NewTree()
+        return g
+
+    @classmethod
+    def new_table(cls, dim):
+        cdef Game g
+        cdef Array[int] *d
+        d = new Array[int](len(dim))
+        for i in range(1, len(dim)+1):
+            setitem_array_int(d, i, dim[i-1])
+        g = cls()
+        g.game = NewTable(d)
+        del d
+        return g
+
+    @classmethod
+    def from_arrays(cls, *arrays):
+        cdef Game g
+        if len(set(a.shape for a in arrays)) > 1:
+            raise ValueError("All specified arrays must have the same shape")
+        g = Game.new_table(arrays[0].shape)
+        for profile in itertools.product(*(xrange(arrays[0].shape[i])
+                                         for i in xrange(len(g.players)))):
+            for pl in xrange(len(g.players)):
+                g[profile][pl] = arrays[pl][profile]
+        return g
+        
+
+    @classmethod
+    def read_game(cls, char *fn):
+        cdef Game g
+        g = cls()
+        try:
+            g.game = ReadGame(fn)
+        except IOError as e:
+            raise IOError("Unable to read game from file '%s': %s" % 
+                        (fn, e))
+        return g
+
+    @classmethod
+    def parse_game(cls, char *s):
+        cdef Game g
+        g = cls()
+        g.game = ParseGame(s)
+        return g        
 
     def __str__(self):
         return "<Game '%s'>" % self.title
@@ -230,11 +282,11 @@ cdef class Game:
 
     property min_payoff:
         def __get__(self):
-            return fractions.Fraction(rat_str(self.game.deref().GetMinPayoff(0)).c_str())
+            return Rational(rat_str(self.game.deref().GetMinPayoff(0)).c_str())
 
     property max_payoff:
         def __get__(self):
-            return fractions.Fraction(rat_str(self.game.deref().GetMaxPayoff(0)).c_str())
+            return Rational(rat_str(self.game.deref().GetMaxPayoff(0)).c_str())
 
     def _get_contingency(self, *args):
         cdef c_PureStrategyProfile *psp
@@ -287,10 +339,12 @@ cdef class Game:
         return self._get_contingency(*tuple(cont))
 
 
-    def mixed_profile(self, rational=False):
+    def mixed_strategy_profile(self, rational=False):
         cdef MixedStrategyProfileDouble mspd
         cdef MixedStrategyProfileRational mspr
         cdef c_Rational dummy_rat
+        if not self.is_perfect_recall:
+            raise UndefinedOperationError("Mixed strategies not supported for games with imperfect recall.")
         if not rational:
             mspd = MixedStrategyProfileDouble()
             mspd.profile = new c_MixedStrategyProfileDouble(self.game.deref().NewMixedStrategyProfile(0.0))
@@ -300,17 +354,17 @@ cdef class Game:
             mspr.profile = new c_MixedStrategyProfileRational(self.game.deref().NewMixedStrategyProfile(dummy_rat))
             return mspr
 
-    def behav_profile(self, rational=False):
-        cdef MixedBehavProfileDouble mbpd
-        cdef MixedBehavProfileRational mbpr
+    def mixed_behavior_profile(self, rational=False):
+        cdef MixedBehaviorProfileDouble mbpd
+        cdef MixedBehaviorProfileRational mbpr
         if self.is_tree:
             if not rational:
-                mbpd = MixedBehavProfileDouble()
-                mbpd.profile = new c_MixedBehavProfileDouble(self.game)
+                mbpd = MixedBehaviorProfileDouble()
+                mbpd.profile = new c_MixedBehaviorProfileDouble(self.game)
                 return mbpd
             else:
-                mbpr = MixedBehavProfileRational()
-                mbpr.profile = new c_MixedBehavProfileRational(self.game)
+                mbpr = MixedBehaviorProfileRational()
+                mbpr.profile = new c_MixedBehaviorProfileRational(self.game)
                 return mbpr
         else:
             raise UndefinedOperationError("Game must have a tree representation"\
@@ -334,3 +388,5 @@ cdef class Game:
         else:
             s.assign(format)
             return WriteGame(self.game, s).c_str()
+
+

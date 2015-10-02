@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/behavextend.h
 // Algorithms for extending behavior profiles to Nash equilibria
@@ -27,16 +27,16 @@
 
 class algExtendsToNash {
 public:
-  bool ExtendsToNash(const Gambit::MixedBehavProfile<double> &p_solution,
-		     const Gambit::BehavSupport &p_littleSupport,
-		     const Gambit::BehavSupport &p_bigSupport);
+  bool ExtendsToNash(const Gambit::MixedBehaviorProfile<double> &p_solution,
+		     const Gambit::BehaviorSupportProfile &p_littleSupport,
+		     const Gambit::BehaviorSupportProfile &p_bigSupport);
 };
 
 class algExtendsToAgentNash {
 public:
-  bool ExtendsToAgentNash(const Gambit::MixedBehavProfile<double> &p_solution,
-			  const Gambit::BehavSupport &p_littleSupport,
-			  const Gambit::BehavSupport &p_bigSupport);
+  bool ExtendsToAgentNash(const Gambit::MixedBehaviorProfile<double> &p_solution,
+			  const Gambit::BehaviorSupportProfile &p_littleSupport,
+			  const Gambit::BehaviorSupportProfile &p_bigSupport);
 };
 
 

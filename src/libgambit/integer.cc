@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/integer.cc
 // Implementation of an arbitrary-length integer class
@@ -2373,7 +2373,7 @@ Integer::Integer(unsigned long y) :rep(Icopy_ulong(0, y)) {}
 
 Integer::Integer(const Integer&  y) :rep(Icopy(0, y.rep)) {}
 
-Integer::~Integer() { if (rep && !STATIC_IntegerRep(rep)) delete rep; }
+Integer::~Integer() { if (rep && !STATIC_IntegerRep(rep)) delete[] rep; }
 
 Integer &Integer::operator=(const Integer &y)
 {

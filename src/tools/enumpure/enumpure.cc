@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpure/enumpure.cc
 // Compute pure-strategy equilibria in extensive form games
@@ -26,132 +26,13 @@
 #include <iostream>
 #include <fstream>
 #include <cerrno>
-#include "libgambit/libgambit.h"
-#include "libgambit/subgame.h"
-
-using namespace Gambit;
-
-template <class T>
-void PrintProfile(std::ostream &p_stream,
-		  const MixedBehavProfile<T> &p_profile)
-{
-  p_stream << "NE,";
-  for (int i = 1; i <= p_profile.Length(); i++) {
-    p_stream << p_profile[i];
-    if (i < p_profile.Length()) {
-      p_stream << ',';
-    }
-  }
-
-  p_stream << std::endl;
-}
-
-List<MixedBehavProfile<Rational> > SolveBehav(const BehavSupport &p_support,
-					      bool p_print = false)
-{
-  List<MixedBehavProfile<Rational> > solutions;
-
-  Game efg = p_support.GetGame();
-
-  for (BehavIterator citer(p_support); !citer.AtEnd(); citer++) {
-    bool isNash = true;
-
-    for (GamePlayerIterator player = efg->Players(); 
-	 isNash && !player.AtEnd(); player++)  {
-      Rational current = citer->GetPayoff<Rational>(player);
-	
-      for (int iset = 1; isNash && iset <= player->NumInfosets(); iset++) {
-	GameInfoset infoset = player->GetInfoset(iset);
-	for (int act = 1; act <= infoset->NumActions(); act++) {
-	  GameAction action = infoset->GetAction(act);
-	  if (citer->GetPayoff<Rational>(action) > current)  {
-	    isNash = false;
-	    break;
-	  }
-	}
-      }
-    }
-      
-    if (isNash)  {
-      MixedBehavProfile<Rational> temp(efg);
-      // zero out all the entries, since any equilibria are pure
-      ((Vector<Rational> &) temp).operator=(Rational(0));
-
-      for (GamePlayerIterator player = efg->Players();
-	   !player.AtEnd(); player++) {
-	for (int iset = 1; iset <= player->NumInfosets(); iset++) {
-	  temp(citer->GetAction(player->GetInfoset(iset))) = 1;
-	}
-      }
-
-      if (p_print) {
-	PrintProfile(std::cout, temp);
-      }
-      solutions.Append(temp);
-    }
-  }
-
-  return solutions;
-}
-
-List<MixedBehavProfile<Rational> > 
-SubsolveBehav(const BehavSupport &p_support)
-{
-  return SolveBehav(p_support, false);
-}
-
-template <class T>
-void PrintProfile(std::ostream &p_stream,
-		  const MixedStrategyProfile<T> &p_profile)
-{
-  p_stream << "NE,";
-  for (int i = 1; i <= p_profile.MixedProfileLength(); i++) {
-    p_stream << p_profile[i];
-    if (i < p_profile.MixedProfileLength()) {
-      p_stream << ',';
-    }
-  }
-
-  p_stream << std::endl;
-}
-
-void SolveMixed(Game p_nfg)
-{
-  for (StrategyIterator citer(p_nfg); !citer.AtEnd(); citer++) {
-    bool flag = true;
-
-    for (GamePlayerIterator player = p_nfg->Players(); 
-	 flag && !player.AtEnd(); player++)  {
-      Rational current = (*citer)->GetPayoff(player);
-      PureStrategyProfile p = (*citer)->Copy(); 
-      for (GameStrategyIterator strategy = player->Strategies();
-	   !strategy.AtEnd(); strategy++) {
-	if (p->GetStrategyValue(strategy) > current)  {
-	  flag = false;
-	  break;
-	}
-      }
-    }
-    
-    if (flag)  {
-      MixedStrategyProfile<Rational> temp(p_nfg->NewMixedStrategyProfile(Rational(0)));
-      ((Vector<Rational> &) temp).operator=(Rational(0));
-      PureStrategyProfile profile = (*citer)->Copy();
-      for (GamePlayerIterator player = p_nfg->Players();
-	   !player.AtEnd(); player++) {
-	temp[profile->GetStrategy(player)] = 1;
-      }
-      
-      PrintProfile(std::cout, temp);
-    }
-  }
-}
+#include "enumpure.h"
 
 
 void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Search for Nash equilibria in pure strategies\n";
-  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
 }
 
@@ -163,7 +44,8 @@ void PrintHelp(char *progname)
   std::cerr << "With no options, locates all Nash equilibria in pure strategies.\n\n";
 
   std::cerr << "Options:\n";
-  std::cerr << "  -S               use strategic game\n";
+  std::cerr << "  -S               report equilibria in strategies even for extensive games\n";
+  std::cerr << "  -A               compute agent form equilibria\n";
   std::cerr << "  -P               find only subgame-perfect equilibria\n";
   std::cerr << "  -h, --help       print this help message\n";
   std::cerr << "  -q               quiet mode (suppresses banner)\n";
@@ -175,8 +57,9 @@ void PrintHelp(char *progname)
 int main(int argc, char *argv[])
 {
   opterr = 0;
-  bool quiet = false, useStrategic = false, bySubgames = false;
-
+  bool quiet = false, reportStrategic = false, solveAgent = false, bySubgames = false;
+  bool printDetail = false;
+  
   int long_opt_index = 0;
   struct option long_options[] = {
     { "help", 0, NULL, 'h'   },
@@ -184,12 +67,18 @@ int main(int argc, char *argv[])
     { 0,    0,    0,    0   }
   };
   int c;
-  while ((c = getopt_long(argc, argv, "vhqSP", long_options, &long_opt_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "DvhqASP", long_options, &long_opt_index)) != -1) {
     switch (c) {
     case 'v':
       PrintBanner(std::cerr); exit(1);
+    case 'D':
+      printDetail = true;
+      break;
     case 'S':
-      useStrategic = true;
+      reportStrategic = true;
+      break;
+    case 'A':
+      solveAgent = true;
       break;
     case 'P':
       bySubgames = true;
@@ -232,31 +121,57 @@ int main(int argc, char *argv[])
 
   try {
     Game game = ReadGame(*input_stream);
-
-    if (!game->IsTree() || useStrategic) {
-      SolveMixed(game);
-    }
-    else {
-      if (bySubgames) {
-	List<MixedBehavProfile<Rational> > solutions;
-	solutions = SolveBySubgames<Rational>(BehavSupport(game), 
-					      &SubsolveBehav);
-	for (int i = 1; i <= solutions.Length(); i++) {
-	  PrintProfile(std::cout, solutions[i]);
-	}
+    shared_ptr<StrategyProfileRenderer<Rational> > renderer;
+    if (reportStrategic || !game->IsTree()) {
+      if (printDetail) {
+	renderer = new MixedStrategyDetailRenderer<Rational>(std::cout);
       }
       else {
-	SolveBehav(game, true);
+	renderer = new MixedStrategyCSVRenderer<Rational>(std::cout);
       }
+    }
+    else {
+      if (printDetail) {
+	renderer = new BehavStrategyDetailRenderer<Rational>(std::cout);
+      }
+      else {
+	renderer = new BehavStrategyCSVRenderer<Rational>(std::cout);
+      }
+    }
+
+    if (game->IsTree())  {
+      if (bySubgames) {
+	shared_ptr<NashBehavSolver<Rational> > stage;
+        if (solveAgent) {
+	  stage = new NashEnumPureAgentSolver();
+	}
+	else {
+	  shared_ptr<NashStrategySolver<Rational> > substage = 
+	    new NashEnumPureStrategySolver();
+	  stage = new NashBehavViaStrategySolver<Rational>(substage);
+	}
+	SubgameNashBehavSolver<Rational> algorithm(stage, renderer);
+	algorithm.Solve(game);
+      }
+      else {
+	if (solveAgent) {
+	  NashEnumPureAgentSolver algorithm(renderer);
+	  algorithm.Solve(game);
+	}
+	else {
+	  NashEnumPureStrategySolver algorithm(renderer);
+	  algorithm.Solve(game);
+	}
+      }
+    }
+    else {
+      NashEnumPureStrategySolver algorithm(renderer);
+      algorithm.Solve(game);
     }
     return 0;
   }
-  catch (InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

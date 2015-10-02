@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, Litao Wei and The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, Litao Wei and The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/nfgcpoly.cc
 // Compute Nash equilibria via heuristic search on game supports
@@ -28,11 +28,11 @@
 //              HeuristicPolEnumModule: Member functions
 //-------------------------------------------------------------------------
 
-HeuristicPolEnumModule::HeuristicPolEnumModule(const StrategySupport &S, int p_stopAfter)
+HeuristicPolEnumModule::HeuristicPolEnumModule(const StrategySupportProfile &S, int p_stopAfter)
   : m_stopAfter(p_stopAfter), NF(S.GetGame()), support(S),
     Space(support.MixedProfileLength()-NF->NumPlayers()), 
     Lex(&Space, lex), num_vars(support.MixedProfileLength()-NF->NumPlayers()), 
-    count(0), nevals(0), is_singular(false)
+    nevals(0), is_singular(false)
 { 
 //  gEpsilon(eps,12);
 }
@@ -151,7 +151,7 @@ HeuristicPolEnumModule::IndifferenceEquation(int i, int strat1, int strat2) cons
 {
   gPoly<double> equation(&Space,&Lex);
 
-  for (StrategyIterator A(support, i, strat1), B(support, i, strat2);
+  for (StrategyProfileIterator A(support, i, strat1), B(support, i, strat2);
        !A.AtEnd(); A++, B++) {
     gPoly<double> term(&Space,(double)1,&Lex);
     int k;
@@ -229,7 +229,7 @@ bool HeuristicPolEnumModule::IsSingular() const
 //                        PolEnumParams: member functions
 //---------------------------------------------------------------------------
 
-int PolEnum(const StrategySupport &support, int p_stopAfter,
+int PolEnum(const StrategySupportProfile &support, int p_stopAfter,
 	    Gambit::List<MixedStrategyProfile<double> > &solutions, 
 	    long &nevals, double &time, bool &is_singular)
 {
@@ -252,7 +252,7 @@ int PolEnum(const StrategySupport &support, int p_stopAfter,
 
 #ifdef UNUSED
 static
-MixedStrategyProfile<double> PolishEquilibrium(const StrategySupport &support, 
+MixedStrategyProfile<double> PolishEquilibrium(const StrategySupportProfile &support,
 				       const MixedStrategyProfile<double> &sol, 
 				       bool &is_singular)
 {

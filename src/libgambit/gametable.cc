@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/gametable.cc
 // Implementation of strategic game representation
@@ -36,9 +36,10 @@ class TablePureStrategyProfileRep : public PureStrategyProfileRep {
 protected:
   long m_index;
 
+  virtual PureStrategyProfileRep *Copy(void) const;
+
 public:
   TablePureStrategyProfileRep(const Game &p_game);
-  virtual PureStrategyProfile Copy(void) const;
   virtual long GetIndex(void) const { return m_index; }
   virtual void SetStrategy(const GameStrategy &);
   virtual GameOutcome GetOutcome(void) const;
@@ -52,19 +53,16 @@ public:
 //------------------------------------------------------------------------
 
 TablePureStrategyProfileRep::TablePureStrategyProfileRep(const Game &p_nfg)
+  : PureStrategyProfileRep(p_nfg), m_index(1L)
 {
-  m_index = 1L;
-  m_nfg = p_nfg;
-  m_profile = Array<GameStrategy>(m_nfg->NumPlayers());
   for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++)   {
-    m_profile[pl] = m_nfg->GetPlayer(pl)->GetStrategy(1);
     m_index += m_profile[pl]->m_offset;
   }
 }
 
-PureStrategyProfile TablePureStrategyProfileRep::Copy(void) const
+PureStrategyProfileRep *TablePureStrategyProfileRep::Copy(void) const
 {
-  return PureStrategyProfile(new TablePureStrategyProfileRep(*this));
+  return new TablePureStrategyProfileRep(*this);
 }
 
 Game NewTable(const Array<int> &p_dim, bool p_sparseOutcomes /*= false*/)
@@ -187,7 +185,7 @@ bool GameTableRep::IsConstSum(void) const
     sum += profile.GetPayoff(pl);
   }
 
-  for (StrategyIterator iter(StrategySupport(const_cast<GameTableRep *>(this)));
+  for (StrategyProfileIterator iter(StrategySupportProfile(const_cast<GameTableRep *>(this)));
        !iter.AtEnd(); iter++) {
     Rational newsum(0);
     for (int pl = 1; pl <= m_players.Length(); pl++) {
@@ -317,19 +315,19 @@ void GameTableRep::DeleteOutcome(const GameOutcome &p_outcome)
 
 MixedStrategyProfile<double> GameTableRep::NewMixedStrategyProfile(double) const
 {
-  return StrategySupport(const_cast<GameTableRep *>(this)).NewMixedStrategyProfile<double>();
+  return StrategySupportProfile(const_cast<GameTableRep *>(this)).NewMixedStrategyProfile<double>();
 }
 
 MixedStrategyProfile<Rational> GameTableRep::NewMixedStrategyProfile(const Rational &) const
 {
-  return StrategySupport(const_cast<GameTableRep *>(this)).NewMixedStrategyProfile<Rational>();
+  return StrategySupportProfile(const_cast<GameTableRep *>(this)).NewMixedStrategyProfile<Rational>();
 }
 
-MixedStrategyProfile<double> GameTableRep::NewMixedStrategyProfile(double, const StrategySupport& spt) const
+MixedStrategyProfile<double> GameTableRep::NewMixedStrategyProfile(double, const StrategySupportProfile& spt) const
 {
   return new TableMixedStrategyProfileRep<double>(spt);
 }
-MixedStrategyProfile<Rational> GameTableRep::NewMixedStrategyProfile(const Rational &, const StrategySupport& spt) const
+MixedStrategyProfile<Rational> GameTableRep::NewMixedStrategyProfile(const Rational &, const StrategySupportProfile& spt) const
 {
   return new TableMixedStrategyProfileRep<Rational>(spt);
 }
@@ -353,7 +351,7 @@ void GameTableRep::RebuildTable(void)
   Array<GameOutcomeRep *> newResults(size);
   for (int i = 1; i <= newResults.Length(); newResults[i++] = 0);
 
-  for (StrategyIterator iter(StrategySupport(const_cast<GameTableRep *>(this)));
+  for (StrategyProfileIterator iter(StrategySupportProfile(const_cast<GameTableRep *>(this)));
        !iter.AtEnd(); iter++) {
     long newindex = 1L;
     for (int pl = 1; pl <= m_players.Length(); pl++) {
@@ -380,19 +378,24 @@ void GameTableRep::RebuildTable(void)
 void GameTableRep::IndexStrategies(void)
 {
   long offset = 1L;
-
-  for (int pl = 1; pl <= m_players.Length(); pl++)  {
-    for (GameStrategyIterator strategy(m_players[pl]->m_strategies);
-	 !strategy.AtEnd(); strategy++) {
-      strategy->m_number = strategy.GetIndex();
-      strategy->m_offset = (strategy.GetIndex() - 1) * offset;
+  for (GamePlayers::const_iterator player = m_players.begin();
+       player != m_players.end(); ++player)  {
+    int st = 1;
+    for (Array<GameStrategyRep *>::const_iterator strategy = player->m_strategies.begin();
+	 strategy != player->m_strategies.end(); ++st, ++strategy) {
+      strategy->m_number = st;
+      strategy->m_offset = (st - 1) * offset;
     }
-    offset *= m_players[pl]->NumStrategies();
+    offset *= player->m_strategies.size();
   }
 
-  for (int pl = 1, id = 1; pl <= m_players.Length(); pl++) {
-    for (int st = 1; st <= m_players[pl]->m_strategies.Length(); 
-	 m_players[pl]->m_strategies[st++]->m_id = id++);
+  int id = 1;
+  for (GamePlayers::const_iterator player = m_players.begin();
+       player != m_players.end(); ++player) {
+    for (Array<GameStrategyRep *>::const_iterator strategy = player->m_strategies.begin();
+	 strategy != player->m_strategies.end(); ++strategy) {
+      strategy->m_id = id++;
+    }
   }
 }
 

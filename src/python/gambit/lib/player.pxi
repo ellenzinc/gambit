@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/player.pxi
 # Cython wrapper for players
@@ -166,7 +166,7 @@ cdef class Player:
             g = Game()
             g.game = self.player.deref().GetGame()
             s = rat_str(g.game.deref().GetMinPayoff(self.number + 1))
-            return fractions.Fraction(s.c_str())
+            return Rational(s.c_str())
 
     property max_payoff:
         def __get__(self):
@@ -175,7 +175,7 @@ cdef class Player:
             g = Game()
             g.game = self.player.deref().GetGame()
             s = rat_str(g.game.deref().GetMaxPayoff(self.number + 1))
-            return fractions.Fraction(s.c_str())
+            return Rational(s.c_str())
 
     def unrestrict(self):
         cdef Game g

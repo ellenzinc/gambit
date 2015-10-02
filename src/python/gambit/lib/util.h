@@ -1,8 +1,8 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
-// FILE: src/python/gambit/lib/util.y
+// FILE: src/python/gambit/lib/util.h
 // Convenience functions for Cython wrapper
 //
 // This program is free software; you can redistribute it and/or modify
@@ -40,7 +40,13 @@ inline Game NewTable(Array<int> *dim)
 Game ReadGame(char *fn) throw (InvalidFileException)
 { 
   std::ifstream f(fn);
-  return Gambit::ReadGame(f);
+  return ReadGame(f);
+}
+
+Game ParseGame(char *s) throw (InvalidFileException)
+{
+  std::istringstream f(s);
+  return ReadGame(f);
 }
 
 std::string WriteGame(const Game &p_game, const std::string &p_format)
@@ -50,48 +56,24 @@ std::string WriteGame(const Game &p_game, const std::string &p_format)
   return f.str();
 }        
 
-inline void setitem_ArrayInt(Array<int> *array, int index, int value)
-{ (*array)[index] = value; }
+std::string WriteGame(const StrategySupportProfile &p_support)
+{
+  std::ostringstream f;
+  p_support.WriteNfgFile(f);
+  return f.str();
+}
 
-inline void 
-setitem_MixedStrategyProfileDouble(MixedStrategyProfile<double> *profile,
-				   int index, double value)
-{ (*profile)[index] = value; }
+// Create a copy on the heap (via new) of the element at index p_index of 
+// container p_container.
+template <template<class> class C, class T, class X> 
+T *copyitem(const C<T> &p_container, const X &p_index)
+{ return new T(p_container[p_index]); }
 
+// Set item p_index to value p_value in container p_container
+template <class C, class X, class T> 
+void setitem(C *p_container, const X &p_index, const T &p_value)
+{ (*p_container)[p_index] = p_value; }
 
-inline void
-setitem_MixedStrategyProfileRational(MixedStrategyProfile<Rational> *profile,
-				     int index, const char *value)
-{ (*profile)[index] = lexical_cast<Rational>(std::string(value)); }
-
-inline void 
-setitem_MixedStrategyProfileDoubleStrategy(MixedStrategyProfile<double> *profile,
-				           GameStrategy index, double value)
-{ (*profile)[index] = value; }
-
-
-inline void
-setitem_MixedStrategyProfileRationalStrategy(MixedStrategyProfile<Rational> *profile,
-				             GameStrategy index, const char *value)
-{ (*profile)[index] = lexical_cast<Rational>(std::string(value)); }
-
-
-inline void 
-setitem_MixedBehavProfileDouble(MixedBehavProfile<double> *profile,
-           int index, double value)
-{ (*profile)[index] = value; }
-
-inline void 
-setitem_MixedBehavProfileRational(MixedBehavProfile<Rational> *profile,
-           int index, const char *value)
-{ (*profile)[index] = lexical_cast<Rational>(std::string(value)); }
-
-inline void 
-setaction_MixedBehavProfileDouble(MixedBehavProfile<double> *profile,
-           GameAction &action, double value)
-{ (*profile)(action) = value; }
-
-inline void 
-setaction_MixedBehavProfileRational(MixedBehavProfile<Rational> *profile,
-           GameAction &action, const char *value)
-{ (*profile)(action) = lexical_cast<Rational>(std::string(value)); }
+// Convert the (C-style) string p_value to a Rational
+inline Rational to_rational(const char *p_value)
+{ return lexical_cast<Rational>(std::string(p_value)); }

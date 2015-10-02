@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/mixed.pxi
 # Cython wrapper for mixed strategy profiles
@@ -19,11 +19,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #
+import itertools
+
 from cython.operator cimport dereference as deref
 from gambit.lib.error import UndefinedOperationError
 
+
 cdef class MixedStrategyProfile(object):
-    def __repr__(self):    return str(list(self))
+    def __repr__(self):   
+        return str([ self[player] for player in self.game.players ])
+
+    def _repr_latex_(self):
+        return r"$\left[" + ",".join([ self[player]._repr_latex_().replace("$","") for player in self.game.players ]) + r"\right]$"
+
     def __richcmp__(MixedStrategyProfile self, other, whichop):
         if whichop == 0:
             return list(self) < list(other)
@@ -66,7 +74,7 @@ cdef class MixedStrategyProfile(object):
         if isinstance(index, int):
             return self._getprob(index+1)
         elif isinstance(index, Strategy):
-            return self._getprob((<Strategy>index).strategy.deref().GetId())
+            return self._getprob_strategy(index)
         elif isinstance(index, Player):
             class MixedStrategy(object):
                 def __init__(self, profile, player):
@@ -78,6 +86,11 @@ cdef class MixedStrategyProfile(object):
                     return len(self.player.strategies)
                 def __repr__(self):
                     return str(list(self.profile[self.player]))
+                def _repr_latex_(self):
+                    if isinstance(self.profile, MixedStrategyProfileRational):
+                       return r"$\left[" + ",".join(self.profile[i]._repr_latex_().replace("$","") for i in self.player.strategies) + r"\right]$"
+                    else:
+                       return repr(self)
                 def __getitem__(self, index):
                     return self.profile[self.player.strategies[index]]
                 def __setitem__(self, index, value):
@@ -94,14 +107,31 @@ cdef class MixedStrategyProfile(object):
             self._setprob(index+1, value)
         elif isinstance(index, Strategy):
             self._setprob_strategy(index, value)
+        elif isinstance(index, Player):
+            self._setprob_player(index, value)
         elif isinstance(index, str):
             self[self._resolve_index(index)] = value
         else:
-            raise TypeError("profile indexes must be int, str or Strategy, not %s" %
+            raise TypeError("profile indexes must be int, str, Player, or Strategy, not %s" %
                             index.__class__.__name__)
 
-    def payoff(self, player):
-        if isinstance(player, Player):
+    def _setprob_player(self, Player player, value):
+        class Filler(object): pass
+        try:
+            for (s, v) in itertools.izip_longest(player.strategies, value, fillvalue=Filler()):
+                if isinstance(s, Filler) or isinstance(v, Filler):
+                     raise ValueError("must specify exactly one value per strategy")
+                self[s] = v
+        except TypeError as e:
+            if "must support iteration" in str(e):
+                raise TypeError("value vector must support iteration")
+            else:
+                raise e
+
+    def payoff(self, player=None):
+        if player is None:
+            return [ self._payoff(player) for player in self.game.players ]
+        elif isinstance(player, Player):
             return self._payoff(player)
         elif isinstance(player, (int, str)):
             return self.payoff(self.game.players[player])
@@ -116,8 +146,10 @@ cdef class MixedStrategyProfile(object):
                             strategy.__class__.__name__)
         return self._strategy_value(strategy)
             
-    def strategy_values(self, player):
-        if isinstance(player, str):
+    def strategy_values(self, player=None):
+        if player is None:
+            return [ self.strategy_values(player) for player in self.game.players ]
+        elif isinstance(player, str):
             player = self.game.players[player]
         elif not isinstance(player, Player):
             raise TypeError("strategy values index must be str or Player, not %s" %
@@ -142,7 +174,6 @@ cdef class MixedStrategyProfile(object):
                             strategy2.__class__.__name__)
         return self._strategy_value_deriv((<Player>player).player.deref().GetNumber(), strategy1, strategy2)
 
-
 cdef class MixedStrategyProfileDouble(MixedStrategyProfile):
     cdef c_MixedStrategyProfileDouble *profile
 
@@ -155,10 +186,12 @@ cdef class MixedStrategyProfileDouble(MixedStrategyProfile):
         return self.profile.GetSupport().GetIndex(st.strategy)
     def _getprob(self, int index):
         return self.profile.getitem(index)
+    def _getprob_strategy(self, Strategy strategy):
+        return self.profile.getitem_strategy(strategy.strategy)
     def _setprob(self, int index, value):
-        setitem_MixedStrategyProfileDouble(self.profile, index, value)
+        setitem_mspd_int(self.profile, index, value)
     def _setprob_strategy(self, Strategy strategy, value):
-        setitem_MixedStrategyProfileDoubleStrategy(self.profile, strategy.strategy, value)
+        setitem_mspd_strategy(self.profile, strategy.strategy, value)
     def _payoff(self, Player player):
         return self.profile.GetPayoff(player.player)
     def _strategy_value(self, Strategy strategy):
@@ -174,24 +207,25 @@ cdef class MixedStrategyProfileDouble(MixedStrategyProfile):
         mixed = MixedStrategyProfileDouble()
         mixed.profile = new c_MixedStrategyProfileDouble(deref(self.profile))
         return mixed
-    def as_behav(self):
-        cdef MixedBehavProfileDouble behav
+    def as_behavior(self):
+        cdef MixedBehaviorProfileDouble behav
         if not self.game.is_tree:
             raise UndefinedOperationError("Mixed behavior profiles are not "\
                                           "defined for strategic games")
-        behav = MixedBehavProfileDouble()
-        behav.profile = new c_MixedBehavProfileDouble(deref(self.profile))
+        behav = MixedBehaviorProfileDouble()
+        behav.profile = new c_MixedBehaviorProfileDouble(deref(self.profile))
         return behav
     def restriction(self):
         cdef StrategicRestriction s
         s = StrategicRestriction()
-        s.support = new c_StrategySupport(self.profile.GetSupport())
+        s.support = new c_StrategySupportProfile(self.profile.GetSupport())
         return s
     def unrestrict(self):
         profile = MixedStrategyProfileDouble()
         profile.profile = new c_MixedStrategyProfileDouble(self.profile.ToFullSupport())
         return profile
-            
+    def set_centroid(self):   self.profile.SetCentroid()
+    def normalize(self):      self.profile.Normalize()
 
     property game:
         def __get__(self):
@@ -212,7 +246,9 @@ cdef class MixedStrategyProfileRational(MixedStrategyProfile):
     def _strategy_index(self, Strategy st):
         return self.profile.GetSupport().GetIndex(st.strategy)
     def _getprob(self, int index):
-        return fractions.Fraction(rat_str(self.profile.getitem(index)).c_str()) 
+        return Rational(rat_str(self.profile.getitem(index)).c_str()) 
+    def _getprob_strategy(self, Strategy strategy):
+        return Rational(rat_str(self.profile.getitem_strategy(strategy.strategy)).c_str())
     def _setprob(self, int index, value):
         cdef char *s
         if not isinstance(value, (int, fractions.Fraction)):
@@ -220,7 +256,7 @@ cdef class MixedStrategyProfileRational(MixedStrategyProfile):
                             value.__class__.__name__)
         t = str(value)
         s = t
-        setitem_MixedStrategyProfileRational(self.profile, index, s)
+        setitem_mspr_int(self.profile, index, to_rational(s))
     def _setprob_strategy(self, Strategy strategy, value):
         cdef char *s
         if not isinstance(value, (int, fractions.Fraction)):
@@ -228,40 +264,42 @@ cdef class MixedStrategyProfileRational(MixedStrategyProfile):
                             value.__class__.__name__)
         t = str(value)
         s = t
-        setitem_MixedStrategyProfileRationalStrategy(self.profile, strategy.strategy, s)
+        setitem_mspr_strategy(self.profile, strategy.strategy, to_rational(s))
     def _payoff(self, Player player):
-        return fractions.Fraction(rat_str(self.profile.GetPayoff(player.player)).c_str())
+        return Rational(rat_str(self.profile.GetPayoff(player.player)).c_str())
     def _strategy_value(self, Strategy strategy):
-        return fractions.Fraction(rat_str(self.profile.GetPayoff(strategy.strategy)).c_str())
+        return Rational(rat_str(self.profile.GetPayoff(strategy.strategy)).c_str())
     def _strategy_value_deriv(self, int pl,
                               Strategy s1, Strategy s2):
-        return fractions.Fraction(rat_str(self.profile.GetPayoffDeriv(pl, s1.strategy, s2.strategy)).c_str())
+        return Rational(rat_str(self.profile.GetPayoffDeriv(pl, s1.strategy, s2.strategy)).c_str())
 
     def liap_value(self):
-        return fractions.Fraction(rat_str(self.profile.GetLiapValue()).c_str())
+        return Rational(rat_str(self.profile.GetLiapValue()).c_str())
     def copy(self):
         cdef MixedStrategyProfileRational mixed
         mixed = MixedStrategyProfileRational()
         mixed.profile = new c_MixedStrategyProfileRational(deref(self.profile))
         return mixed
-    def as_behav(self):
-        cdef MixedBehavProfileRational behav
+    def as_behavior(self):
+        cdef MixedBehaviorProfileRational behav
         if not self.game.is_tree:
             raise UndefinedOperationError("Mixed behavior profiles are not "\
                                           "defined for strategic games")
-        behav = MixedBehavProfileRational()
-        behav.profile = new c_MixedBehavProfileRational(deref(self.profile))
+        behav = MixedBehaviorProfileRational()
+        behav.profile = new c_MixedBehaviorProfileRational(deref(self.profile))
         return behav
     def restriction(self):
         cdef StrategicRestriction s
         s = StrategicRestriction()
-        s.support = new c_StrategySupport(self.profile.GetSupport())
+        s.support = new c_StrategySupportProfile(self.profile.GetSupport())
         return s
     def unrestrict(self):
         profile = MixedStrategyProfileRational()
         profile.profile = new c_MixedStrategyProfileRational(self.profile.ToFullSupport())
         return profile
-    
+    def set_centroid(self):   self.profile.SetCentroid()
+    def normalize(self):      self.profile.Normalize()
+
     property game:
         def __get__(self):
             cdef Game g

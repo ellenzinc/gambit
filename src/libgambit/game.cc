@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/game.cc
 // Implementation of extensive form game representation
@@ -35,7 +35,7 @@ namespace Gambit {
 
 GameOutcomeRep::GameOutcomeRep(GameRep *p_game, int p_number)
   : m_game(p_game), m_number(p_number),
-    m_payoffs(m_game->NumPlayers())
+    m_payoffs(m_game->NumPlayers()), m_unrestricted(0)
 { }
 
 
@@ -61,7 +61,7 @@ void GameStrategyRep::DeleteStrategy(void)
 //========================================================================
 
 GamePlayerRep::GamePlayerRep(GameRep *p_game, int p_id, int p_strats)
-  : m_game(p_game), m_number(p_id), m_strategies(p_strats)
+  : m_game(p_game), m_number(p_id), m_strategies(p_strats), m_unrestricted(0)
 { 
   for (int j = 1; j <= p_strats; j++) {
     m_strategies[j] = new GameStrategyRep(this);
@@ -185,14 +185,112 @@ GameInfoset GamePlayerRep::GetInfoset(int p_index) const { return m_infosets[p_i
 
 
 //========================================================================
-//                       class PureBehavProfile
+//                    class PureStrategyProfileRep
+//========================================================================
+
+PureStrategyProfileRep::PureStrategyProfileRep(const Game &p_game) 
+  : m_nfg(p_game), m_profile(p_game->Players().size())
+{
+  for (int pl = 1; pl <= m_nfg->Players().size(); pl++)  {
+    m_profile[pl] = m_nfg->GetPlayer(pl)->GetStrategy(1);
+  }
+}
+
+bool PureStrategyProfileRep::IsNash(void) const
+{
+  for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++) {
+    GamePlayer player = m_nfg->GetPlayer(pl);
+    Rational current = GetPayoff(player);
+    for (GameStrategyArray::const_iterator strategy = player->Strategies().begin();
+	 strategy != player->Strategies().end();
+	 ++strategy)  {
+      if (GetStrategyValue(*strategy) > current) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool PureStrategyProfileRep::IsStrictNash(void) const
+{
+  for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++) {
+    GamePlayer player = m_nfg->GetPlayer(pl);
+    Rational current = GetPayoff(player);
+    for (GameStrategyArray::const_iterator strategy = player->Strategies().begin();
+	 strategy != player->Strategies().end();
+	 ++strategy) {
+      if (GetStrategyValue(*strategy) >= current) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool PureStrategyProfileRep::IsBestResponse(const GamePlayer &p_player) const
+{
+  Rational current = GetPayoff(p_player);
+  for (GameStrategyArray::const_iterator strategy = p_player->Strategies().begin();
+       strategy != p_player->Strategies().end();
+       ++strategy) {
+    if (GetStrategyValue(*strategy) > current) {
+      return false;
+    }
+  }
+  return true;
+}
+
+List<GameStrategy> 
+PureStrategyProfileRep::GetBestResponse(const GamePlayer &p_player) const
+{
+  GameStrategyArray::const_iterator strategy = p_player->Strategies().begin();
+  Rational max_payoff = GetStrategyValue(*strategy);
+  List<GameStrategy> br;
+  br.push_back(*strategy);
+  for (++strategy; strategy != p_player->Strategies().end(); ++strategy)  {
+    Rational this_payoff = GetStrategyValue(*strategy);
+    if (this_payoff > max_payoff) {
+      br.clear();
+      max_payoff = this_payoff;
+    }
+    if (this_payoff >= max_payoff) {
+      br.push_back(*strategy);
+    }
+  }
+  return br;
+}
+
+MixedStrategyProfile<Rational>
+PureStrategyProfileRep::ToMixedStrategyProfile(void) const
+{
+  MixedStrategyProfile<Rational> temp(m_nfg->NewMixedStrategyProfile(Rational(0)));
+  static_cast<Vector<Rational> &>(temp).operator=(Rational(0));
+  for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++) {
+    temp[GetStrategy(m_nfg->GetPlayer(pl))] = 1;
+  }
+  return temp;
+}
+
+PureStrategyProfile PureStrategyProfileRep::Unrestrict(void) const
+{
+  PureStrategyProfile u = m_nfg->Unrestrict()->NewPureStrategyProfile();
+  for (GamePlayers::const_iterator player = this->m_nfg->Players().begin();
+    player != m_nfg->Players().end(); ++player)  {
+    u->SetStrategy(GetStrategy(*player)->Unrestrict());
+  }
+  return u;
+}
+
+//========================================================================
+//                       class PureBehaviorProfile
 //========================================================================
 
 //------------------------------------------------------------------------
-//                     PureBehavProfile: Lifecycle
+//                     PureBehaviorProfile: Lifecycle
 //------------------------------------------------------------------------
 
-PureBehavProfile::PureBehavProfile(Game p_efg)
+PureBehaviorProfile::PureBehaviorProfile(Game p_efg)
   : m_efg(p_efg), m_profile(m_efg->NumPlayers())
 {
   for (int pl = 1; pl <= m_efg->NumPlayers(); pl++)  {
@@ -205,22 +303,22 @@ PureBehavProfile::PureBehavProfile(Game p_efg)
 }
 
 //------------------------------------------------------------------------
-//              PureBehavProfile: Data access and manipulation
+//              PureBehaviorProfile: Data access and manipulation
 //------------------------------------------------------------------------
 
-GameAction PureBehavProfile::GetAction(const GameInfoset &infoset) const
+GameAction PureBehaviorProfile::GetAction(const GameInfoset &infoset) const
 {
   return m_profile[infoset->GetPlayer()->GetNumber()][infoset->GetNumber()];
 }
 
-void PureBehavProfile::SetAction(const GameAction &action)
+void PureBehaviorProfile::SetAction(const GameAction &action)
 {
   m_profile[action->GetInfoset()->GetPlayer()->GetNumber()]
     [action->GetInfoset()->GetNumber()] = action;
 }
 
 template <class T> 
-T PureBehavProfile::GetPayoff(const GameNode &p_node,
+T PureBehaviorProfile::GetPayoff(const GameNode &p_node,
 				 int pl) const
 {
   T payoff(0);
@@ -251,20 +349,52 @@ T PureBehavProfile::GetPayoff(const GameNode &p_node,
 }
 
 // Explicit instantiations
-template double PureBehavProfile::GetPayoff(const GameNode &, int pl) const;
-template Rational PureBehavProfile::GetPayoff(const GameNode &, int pl) const;
+template double PureBehaviorProfile::GetPayoff(const GameNode &, int pl) const;
+template Rational PureBehaviorProfile::GetPayoff(const GameNode &, int pl) const;
 
 template <class T>
-T PureBehavProfile::GetPayoff(const GameAction &p_action) const
+T PureBehaviorProfile::GetPayoff(const GameAction &p_action) const
 {
-  PureBehavProfile copy(*this);
+  PureBehaviorProfile copy(*this);
   copy.SetAction(p_action);
   return copy.GetPayoff<T>(p_action->GetInfoset()->GetPlayer()->GetNumber());
 }
 
 // Explicit instantiations
-template double PureBehavProfile::GetPayoff(const GameAction &) const;
-template Rational PureBehavProfile::GetPayoff(const GameAction &) const;
+template double PureBehaviorProfile::GetPayoff(const GameAction &) const;
+template Rational PureBehaviorProfile::GetPayoff(const GameAction &) const;
+
+bool PureBehaviorProfile::IsAgentNash(void) const
+{
+  for (int pl = 1; pl <= m_efg->NumPlayers(); pl++)  {
+    GamePlayer player = m_efg->GetPlayer(pl);
+    Rational current = GetPayoff<Rational>(player);
+    for (int iset = 1; iset <= player->NumInfosets(); iset++) {
+      GameInfoset infoset = player->GetInfoset(iset);
+      for (int act = 1; act <= infoset->NumActions(); act++) {
+	GameAction action = infoset->GetAction(act);
+	if (GetPayoff<Rational>(action) > current)  {
+	  return false;
+	}
+      }
+    }
+  }
+  return true;
+}
+
+MixedBehaviorProfile<Rational>
+PureBehaviorProfile::ToMixedBehaviorProfile(void) const
+{
+  MixedBehaviorProfile<Rational> temp(m_efg);
+  static_cast<Vector<Rational> &>(temp) = Rational(0);
+  for (int pl = 1; pl <= m_efg->NumPlayers(); pl++) {
+    GamePlayer player = m_efg->GetPlayer(pl);
+    for (int iset = 1; iset <= player->NumInfosets(); iset++) {
+      temp(GetAction(player->GetInfoset(iset))) = 1;
+    }
+  }
+  return temp;
+}
 
 //========================================================================
 //                       class GameExplicitRep
@@ -410,6 +540,5 @@ void GameExplicitRep::Write(std::ostream &p_stream,
     throw UndefinedException();
   }
 }
-
 
 }  // end namespace Gambit

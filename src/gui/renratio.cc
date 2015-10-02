@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/gui/renratio.cc
 // Implementation of wxSheet renderer for rational numbers
@@ -172,7 +172,7 @@ void gbtRationalRendererRefData::DoDraw(wxSheet& grid,
   
   wxString value = grid.GetCellValue(coords);
   //int best_width = DoGetBestSize(grid, attr, dc, value).GetWidth();
-  wxSheetCoords cellSpan(grid.GetCellSpan(coords)); // shouldn't get here if <=0
+  // wxSheetCoords cellSpan(grid.GetCellSpan(coords)); // shouldn't get here if <=0
   //int cell_rows = cellSpan.m_row;
   //int cell_cols = cellSpan.m_col;
   

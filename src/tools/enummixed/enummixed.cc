@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enummixed/enummixed.cc
 // Compute Nash equilibria via Mangasarian's algorithm
@@ -77,7 +77,7 @@ void PrintProfile(std::ostream &p_stream,
 }
 
 template <class T> void GetCliques(std::ostream &p_stream,
-				   const StrategySupport &p_support,
+				   const Game &p_game,
 				   const List<int> &p_node1,
 				   const List<Vector<T> > &p_key1,
 				   int p_v1,
@@ -90,26 +90,9 @@ template <class T> void GetCliques(std::ostream &p_stream,
 
   Array<edge> edgelist(n);
 
-  //p_stream << "\nKey:\nPlayer 1:";
-  //for (int i = 1; i <= p_key1.Length(); i++) {
-    //p_stream << "\n" << i << ":";
-    //for (int j = 1; j <= p_key1[i].Length(); j++) {
-    //  p_stream << " " << p_key1[i][j];
-    //}
-  //p_stream << "\n";
-  //}
-  //p_stream << "\nPlayer 2:";
-  //for (int i = 1; i <= p_key2.Length(); i++) {
-  // p_stream << "\n" << i << ": ";
-  // for (int j = 1; j <= p_key2[i].Length(); j++) {
-  //    p_stream << " " << p_key2[i][j];
-  //  }
-  //}
-  //p_stream << "\nExtreme equilibria:";
   for (int i = 1; i <= n; i++) {
     edgelist[i].node1 = p_node1[i];
     edgelist[i].node2 = p_node2[i];
-    // p_stream << "\n" << p_node1[i] << " " << p_node2[i];
   }
 
   EnumCliques clique(edgelist, p_v2+1, p_v1+1);
@@ -119,7 +102,7 @@ template <class T> void GetCliques(std::ostream &p_stream,
   for (int cl = 1; cl <= cliques1.Length(); cl++) {
     for (int i = 1; i <= cliques1[cl].Length(); i++) {
       for (int j = 1; j <= cliques2[cl].Length(); j++) {
-	MixedStrategyProfile<T> profile(p_support.NewMixedStrategyProfile<T>());
+	MixedStrategyProfile<T> profile(p_game->NewMixedStrategyProfile(static_cast<T>(0)));
 
 	for (int k = 1; k <= p_key1[cliques1[cl][i]].Length(); k++) {
 	  profile[k] = p_key1[cliques1[cl][i]][k];
@@ -128,28 +111,27 @@ template <class T> void GetCliques(std::ostream &p_stream,
 	  profile[k + p_key1[cliques1[cl][i]].Length()] =
 	    p_key2[cliques2[cl][j]][k];
 	}
-
 	PrintProfile(p_stream, "convex-" + lexical_cast<std::string>(cl), 
-		     profile.ToFullSupport());
+		     profile);
       }
     }
   }
 }
 
-template <class T> void Solve(const StrategySupport &p_support)
+template <class T> void Solve(const Game &p_game)
 {
   List<Vector<T> > key1, key2;  
   List<int> node1, node2;   // IDs of each component of the extreme equilibria
 
-  PureStrategyProfile profile = p_support.GetGame()->NewPureStrategyProfile();
+  PureStrategyProfile profile = p_game->NewPureStrategyProfile();
 
-  Rational min = p_support.GetGame()->GetMinPayoff();
+  Rational min = p_game->GetMinPayoff();
   if (min > Rational(0)) {
     min = Rational(0);
   }
   min -= Rational(1);
 
-  Rational max = p_support.GetGame()->GetMaxPayoff();
+  Rational max = p_game->GetMaxPayoff();
   if (max < Rational(0)) {
     max = Rational(0);
   }
@@ -157,23 +139,23 @@ template <class T> void Solve(const StrategySupport &p_support)
   Rational fac(1, max - min);
 
   // Construct matrices A1, A2
-  Matrix<T> A1(1, p_support.NumStrategies(1),
-	       1, p_support.NumStrategies(2));
-  Matrix<T> A2(1, p_support.NumStrategies(2),
-	       1, p_support.NumStrategies(1));
+  Matrix<T> A1(1, p_game->Players()[1]->Strategies().size(),
+	       1, p_game->Players()[2]->Strategies().size());
+  Matrix<T> A2(1, p_game->Players()[2]->Strategies().size(),
+	       1, p_game->Players()[1]->Strategies().size());
 
-  for (int i = 1; i <= p_support.NumStrategies(1); i++) {
-    profile->SetStrategy(p_support.GetStrategy(1, i));
-    for (int j = 1; j <= p_support.NumStrategies(2); j++) {
-      profile->SetStrategy(p_support.GetStrategy(2, j));
+  for (int i = 1; i <= p_game->Players()[1]->Strategies().size(); i++) {
+    profile->SetStrategy(p_game->Players()[1]->Strategies()[i]);
+    for (int j = 1; j <= p_game->Players()[2]->Strategies().size(); j++) {
+      profile->SetStrategy(p_game->Players()[2]->Strategies()[j]);
       A1(i, j) = fac * (profile->GetPayoff(1) - min);
       A2(j, i) = fac * (profile->GetPayoff(2) - min);
     }
   }
 
   // Construct vectors b1, b2
-  Vector<T> b1(1, p_support.NumStrategies(1));
-  Vector<T> b2(1, p_support.NumStrategies(2));
+  Vector<T> b1(1, p_game->Players()[1]->Strategies().size());
+  Vector<T> b2(1, p_game->Players()[2]->Strategies().size());
   b1 = (T) -1;
   b2 = (T) -1;
 
@@ -194,108 +176,73 @@ template <class T> void Solve(const StrategySupport &p_support)
   int i = 0;
   int id1 = 0, id2 = 0;
 
-  try {
-    for (int i2 = 2; i2 <= v2; i2++) {
-      BFS<T> bfs1 = verts2[i2];
-      i++;
-      for (int i1 = 2; i1 <= v1; i1++) {
-	BFS<T> bfs2 = verts1[i1];
+  for (int i2 = 2; i2 <= v2; i2++) {
+    BFS<T> bfs1 = verts2[i2];
+    i++;
+    for (int i1 = 2; i1 <= v1; i1++) {
+      BFS<T> bfs2 = verts1[i1];
 	
-	// check if solution is nash 
-	// need only check complementarity, since it is feasible
-	bool nash = true;
-	for (int k = 1; nash && k <= p_support.NumStrategies(1); k++) {
-	  if (bfs1.count(k) && bfs2.count(-k)) {
-	    nash = nash && EqZero(bfs1[k] * bfs2[-k]);
-	  }
-	}
-
-	for (int k = 1; nash && k <= p_support.NumStrategies(2); k++) {
-	  if (bfs2.count(k) && bfs1.count(-k)) {
-	    nash = nash && EqZero(bfs2[k] * bfs1[-k]);
-	  }
-	}
-
-	if (nash) {
-	  MixedStrategyProfile<T> profile(p_support.NewMixedStrategyProfile<T>());
-	  T sum = (T) 0;
-	  for (int k = 1; k <= p_support.NumStrategies(1); k++) {
-	    profile[p_support.GetStrategy(1, k)] = (T) 0;
-	    if (bfs1.count(k)) {
-	      profile[p_support.GetStrategy(1, k)] = -bfs1[k];
-	      sum += profile[p_support.GetStrategy(1, k)];
-	    }
-	  } 
-	  
-	  for (int k = 1; k <= p_support.NumStrategies(1); k++) {
-	    if (bfs1.count(k)) { 
-	      profile[p_support.GetStrategy(1, k)] /= sum;
-	    }
-	  }
-	  
-	  sum = (T) 0;
-	  for (int k = 1; k <= p_support.NumStrategies(2); k++) {
-	    profile[p_support.GetStrategy(2, k)] = (T) 0;
-	    if (bfs2.count(k)) {
-	      profile[p_support.GetStrategy(2, k)] = -bfs2[k];
-	      sum += profile[p_support.GetStrategy(2, k)];
-	    }
-	  } 
-	  
-	  for (int k = 1; k <= p_support.NumStrategies(2); k++) {
-	    if (bfs2.count(k)) { 
-	      profile[p_support.GetStrategy(2, k)] /= sum;
-	    }
-	  }
-
-	  PrintProfile(std::cout, "NE", profile.ToFullSupport());
-	  
-	  // note: The keys give the mixed strategy associated with each node. 
-	  //       The keys should also keep track of the basis
-	  //       As things stand now, two different bases could lead to
-	  //       the same key... BAD!
-	  if (vert1id[i1] == 0) {
-	    id1++;
-	    vert1id[i1] = id1;
-
-	    Vector<T> probs(profile.GetSupport().NumStrategies(2));
-	    for (SupportStrategyIterator strategy = profile.GetSupport().Strategies(profile.GetGame()->GetPlayer(2));
-		 !strategy.AtEnd(); strategy++) {
-	      probs[strategy.GetIndex()] = profile[strategy];
-	    }
-	    key2.Append(probs);
-	  }
-	  if (vert2id[i2] == 0) {
-	    id2++;
-	    vert2id[i2] = id2;
-
-	    Vector<T> probs(profile.GetSupport().NumStrategies(1));
-	    for (SupportStrategyIterator strategy = profile.GetSupport().Strategies(profile.GetGame()->GetPlayer(1));
-		 !strategy.AtEnd(); strategy++) {
-	      probs[strategy.GetIndex()] = profile[strategy];
-	    }
-	    key1.Append(probs);
-	  }
-	  node1.Append(vert2id[i2]);
-	  node2.Append(vert1id[i1]);
+      // check if solution is nash 
+      // need only check complementarity, since it is feasible
+      bool nash = true;
+      for (int k = 1; nash && k <= p_game->Players()[1]->Strategies().size(); k++) {
+	if (bfs1.count(k) && bfs2.count(-k)) {
+	  nash = nash && EqZero(bfs1[k] * bfs2[-k]);
 	}
       }
-    }
-    if (g_showConnect) {
-      GetCliques(std::cout, p_support, node1, key1, v1, node2, key2, v2);
+
+      for (int k = 1; nash && k <= p_game->Players()[2]->Strategies().size(); k++) {
+	if (bfs2.count(k) && bfs1.count(-k)) {
+	  nash = nash && EqZero(bfs2[k] * bfs1[-k]);
+	}
+      }
+
+      if (nash) {
+	MixedStrategyProfile<T> profile(p_game->NewMixedStrategyProfile(static_cast<T>(0)));
+	static_cast<Vector<T> &>(profile) = static_cast<T>(0);
+	for (int k = 1; k <= p_game->Players()[1]->Strategies().size(); k++) {
+	  if (bfs1.count(k)) {
+	    profile[p_game->Players()[1]->Strategies()[k]] = -bfs1[k];
+	  }
+	} 
+	for (int k = 1; k <= p_game->Players()[2]->Strategies().size(); k++) {
+	  if (bfs2.count(k)) {
+	    profile[p_game->Players()[2]->Strategies()[k]] = -bfs2[k];
+	  }
+	} 
+	profile.Normalize();
+	PrintProfile(std::cout, "NE", profile);
+	  
+	// note: The keys give the mixed strategy associated with each node. 
+	//       The keys should also keep track of the basis
+	//       As things stand now, two different bases could lead to
+	//       the same key... BAD!
+	if (vert1id[i1] == 0) {
+	  id1++;
+	  vert1id[i1] = id1;
+	  key2.push_back(profile[p_game->GetPlayer(2)]);
+	}
+	if (vert2id[i2] == 0) {
+	  id2++;
+	  vert2id[i2] = id2;
+	  key1.push_back(profile[p_game->GetPlayer(1)]);
+	}
+	node1.Append(vert2id[i2]);
+	node2.Append(vert1id[i1]);
+      }
     }
   }
-  catch (...) {
-    // stop processing, just return equilibria found (if any)
+  if (g_showConnect) {
+    GetCliques(std::cout, p_game, node1, key1, v1, node2, key2, v2);
   }
 }
 
-extern void LrsSolve(const StrategySupport &);
+extern void LrsSolve(const Game &);
 
 void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Compute Nash equilibria by enumerating extreme points\n";
-  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "Enumeration code based on lrslib 4.2b,\n";
   p_stream << "Copyright (C) 1995-2005 by David Avis (avis@cs.mcgill.ca)\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
@@ -388,38 +335,27 @@ int main(int argc, char *argv[])
 
   try {
     Game game = ReadGame(*input_stream);
-
     if (game->NumPlayers() != 2) {
       std::cerr << "Error: Game does not have two players.\n";
       return 1;
     }
-
-    StrategySupport support(game);
-    if (eliminate) {
-      while (true) {
-	StrategySupport newSupport = support.Undominated(true);
-	if (newSupport == support) break;
-	support = newSupport;
-      }
+    if (!game->IsPerfectRecall()) {
+      throw UndefinedException("Computing equilibria of games with imperfect recall is not supported.");
     }
 
     if (uselrs) {
-      LrsSolve(support);
+      LrsSolve(game);
     }
     else if (useFloat) {
-      Solve<double>(support);
+      Solve<double>(game);
     }
     else {
-      Solve<Rational>(support);
+      Solve<Rational>(game);
     }
     return 0;
   }
-  catch (InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

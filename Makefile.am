@@ -1,6 +1,6 @@
 ##
 ## This file is part of Gambit
-## Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+## Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 ##
 ## FILE: Makefile.am
 ## Top-level automake input file for Gambit
@@ -270,11 +270,13 @@ EXTRA_DIST = \
 	src/python/gambit/lib/libgambit.cpp \
 	src/python/gambit/lib/libgambit.pyx \
 	src/python/gambit/lib/mixed.pxi \
+	src/python/gambit/lib/nash.pxi \
 	src/python/gambit/lib/node.pxi \
 	src/python/gambit/lib/outcome.pxi \
 	src/python/gambit/lib/player.pxi \
 	src/python/gambit/lib/strategy.pxi \
 	src/python/gambit/lib/stratspt.pxi \
+        src/python/gambit/lib/nash.h \
 	src/python/gambit/lib/util.h \
 	src/python/gambit/tests/test_actions.py \
 	src/python/gambit/tests/test_behav.py \
@@ -307,6 +309,7 @@ libgambit_la_SOURCES = \
 	src/libgambit/integer.h \
 	src/libgambit/rational.cc \
 	src/libgambit/rational.h \
+	src/libgambit/shared_ptr.h \
 	src/libgambit/array.h \
 	src/libgambit/list.h \
 	src/libgambit/vector.cc \
@@ -347,16 +350,23 @@ libgambit_la_SOURCES = \
 	src/libgambit/stratitr.h \
 	src/libgambit/stratspt.cc \
 	src/libgambit/stratspt.h \
-	src/libgambit/subgame.cc \
-	src/libgambit/subgame.h \
+	src/libgambit/nash.cc \
+	src/libgambit/nash.h \
 	src/libgambit/file.cc \
 	src/libgambit/libgambit.h \
+	src/libgambit/function.cc \
+	src/libgambit/function.h \
+	src/libgambit/tinyxml.cc \
+	src/libgambit/tinyxml.h \
+	src/libgambit/tinyxmlerror.cc \
+	src/libgambit/tinyxmlparser.cc \
 	${libagg_la_SOURCES}
 
 libgambitincludedir = $(includedir)/libgambit
 libgambitinclude_HEADERS = \
 	src/libgambit/integer.h \
 	src/libgambit/rational.h \
+	src/libgambit/shared_ptr.h \
 	src/libgambit/array.h \
 	src/libgambit/list.h \
 	src/libgambit/vector.h \
@@ -381,14 +391,20 @@ libgambitinclude_HEADERS = \
 	src/libgambit/stratitr.h \
 	src/libgambit/stratspt.h \
 	src/libgambit/libgambit.h \
+	src/libgambit/function.h \
+	src/libgambit/tinyxml.h \
 	${libagginclude_HEADERS}
 
 libagg_la_SOURCES = \
 	src/libgambit/gameagg.cc \
 	src/libgambit/gameagg.h \
+	src/libgambit/gamebagg.cc \
+	src/libgambit/gamebagg.h \
 	src/libagg/GrayComposition.h \
 	src/libagg/agg.cc \
 	src/libagg/agg.h \
+	src/libagg/bagg.cc \
+	src/libagg/bagg.h \
 	src/libagg/proj_func.h \
 	src/libagg/trie_map.h \
         src/libagg/trie_map.imp
@@ -396,8 +412,10 @@ libagg_la_SOURCES = \
 libaggincludedir = $(includedir)/libagg
 libagginclude_HEADERS = \
 	src/libgambit/gameagg.h \
+	src/libgambit/gamebagg.h \
 	src/libagg/GrayComposition.h \
 	src/libagg/agg.h \
+	src/libagg/bagg.h \
 	src/libagg/proj_func.h \
 	src/libagg/trie_map.h \
         src/libagg/trie_map.imp
@@ -410,8 +428,7 @@ AM_LDFLAGS = -static-libgcc -static-libstdc++
 endif
 
 bin_PROGRAMS = \
-	gambit-nfg2html \
-	gambit-nfg2tex \
+	gambit-convert \
 	gambit-enummixed
 
 if WITH_ENUMPOLY
@@ -425,11 +442,8 @@ bin_PROGRAMS += \
 	gambit-lcp \
 	gambit-liap \
 	gambit-logit \
-	gambit-nfg-logitdyn \
 	gambit-lp \
 	gambit-simpdiv
-
-bin_PROGRAMS += gambit-testagg
 
 if WITH_GUI
 bin_PROGRAMS += gambit
@@ -441,13 +455,11 @@ AM_CPPFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/labenski/include ${WX_CXXF
 
 ## Command-line tools
 
-gambit_nfg2html_SOURCES = \
+gambit_convert_SOURCES = \
 	${libgambit_la_SOURCES} \
-	src/tools/convert/nfg2html.cc
-
-gambit_nfg2tex_SOURCES = \
-	${libgambit_la_SOURCES} \
-	src/tools/convert/nfg2tex.cc
+	src/tools/convert/convert.cc \
+	src/tools/convert/tohtml.cc \
+	src/tools/convert/tosgame.cc
 
 liblinear_la_SOURCES = \
 	src/liblinear/basis.cc \
@@ -588,7 +600,8 @@ gambit_enumpoly_SOURCES = \
 
 gambit_enumpure_SOURCES = \
 	${libgambit_la_SOURCES} \
-	src/tools/enumpure/enumpure.cc
+	src/tools/enumpure/enumpure.cc \
+        src/tools/enumpure/enumpure.h
 
 gambit_gnm_SOURCES = \
 	${libgambit_la_SOURCES} \
@@ -628,15 +641,17 @@ gambit_lcp_SOURCES = \
 	src/tools/lcp/lhtab.h \
 	src/tools/lcp/lhtab.imp \
 	src/tools/lcp/efglcp.cc \
+	src/tools/lcp/efglcp.h \
 	src/tools/lcp/nfglcp.cc \
+	src/tools/lcp/nfglcp.h \
 	src/tools/lcp/lcp.cc
 
 gambit_liap_SOURCES = \
 	${libgambit_la_SOURCES} \
-	src/tools/liap/funcmin.cc \
-	src/tools/liap/funcmin.h \
 	src/tools/liap/efgliap.cc \
+	src/tools/liap/efgliap.h \
 	src/tools/liap/nfgliap.cc \
+	src/tools/liap/nfgliap.h \
 	src/tools/liap/liap.cc
 
 gambit_logit_SOURCES = \
@@ -651,26 +666,19 @@ gambit_logit_SOURCES = \
 	src/tools/logit/nfglogit.cc \
 	src/tools/logit/logit.cc
 
-gambit_nfg_logitdyn_SOURCES = \
-	${libgambit_la_SOURCES} \
-	src/tools/logit/nfgdyn.cc
-
-
 gambit_lp_SOURCES = \
 	${libgambit_la_SOURCES} \
 	${liblinear_la_SOURCES} \
 	src/tools/lp/efglp.cc \
+	src/tools/lp/efglp.h \
 	src/tools/lp/nfglp.cc \
+	src/tools/lp/nfglp.h \
 	src/tools/lp/lp.cc
 
 
 gambit_simpdiv_SOURCES = \
 	${libgambit_la_SOURCES} \
 	src/tools/simpdiv/nfgsimpdiv.cc
-
-gambit_testagg_SOURCES = \
-	${libgambit_la_SOURCES} \
-	src/libagg/getpayoffs.cc
 
 gambit_SOURCES = \
 	${libgambit_la_SOURCES} \
@@ -791,11 +799,7 @@ gambit_SOURCES = \
 	src/gui/style.cc \
 	src/gui/style.h \
 	src/gui/valnumber.cc \
-	src/gui/valnumber.h \
-	src/gui/tinyxml.cc \
-	src/gui/tinyxml.h \
-	src/gui/tinyxmlerror.cc \
-	src/gui/tinyxmlparser.cc
+	src/gui/valnumber.h
 
 
 gambit_LDADD = \

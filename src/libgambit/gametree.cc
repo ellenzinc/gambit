@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/gametree.cc
 // Implementation of extensive game representation
@@ -348,12 +348,11 @@ void GameTreeNodeRep::DeleteParent(void)
 
 void GameTreeNodeRep::DeleteTree(void)
 {
-  for (int i = 1; i <= children.Length(); i++) {
-    children[i]->DeleteTree();
-    children[i]->Invalidate();
+  while (children.Length() > 0) {
+    children[1]->DeleteTree();
+    children[1]->Invalidate();
+    children.Remove(1);
   }
-  children = Array<GameTreeNodeRep *>();
-
   if (infoset) {
     infoset->RemoveMember(this);
     infoset = 0;
@@ -905,7 +904,7 @@ void GameTreeRep::WriteNfgFile(std::ostream &p_file) const
   // For trees, we write the payoff version, since there need not be
   // a one-to-one correspondence between outcomes and entries, when there
   // are chance moves.
-  StrategyIterator iter(Game(const_cast<GameTreeRep *>(this)));
+  StrategyProfileIterator iter(Game(const_cast<GameTreeRep *>(this)));
     
   for (; !iter.AtEnd(); iter++) {
     for (int pl = 1; pl <= NumPlayers(); pl++) {
@@ -1066,21 +1065,33 @@ int GameTreeRep::NumNodes(void) const
 
 MixedStrategyProfile<double> GameTreeRep::NewMixedStrategyProfile(double) const
 {
-  return StrategySupport(const_cast<GameTreeRep *>(this)).NewMixedStrategyProfile<double>();
+  if (!this->IsPerfectRecall()) {
+    throw UndefinedException("Mixed strategies not supported for games with imperfect recall.");
+  }    
+  return StrategySupportProfile(const_cast<GameTreeRep *>(this)).NewMixedStrategyProfile<double>();
 }
 
 MixedStrategyProfile<Rational> GameTreeRep::NewMixedStrategyProfile(const Rational &) const
 {
-  return StrategySupport(const_cast<GameTreeRep *>(this)).NewMixedStrategyProfile<Rational>();
+  if (!this->IsPerfectRecall()) {
+    throw UndefinedException("Mixed strategies not supported for games with imperfect recall.");
+  }    
+  return StrategySupportProfile(const_cast<GameTreeRep *>(this)).NewMixedStrategyProfile<Rational>();
 }
 
-MixedStrategyProfile<double> GameTreeRep::NewMixedStrategyProfile(double, const StrategySupport& spt) const
+MixedStrategyProfile<double> GameTreeRep::NewMixedStrategyProfile(double, const StrategySupportProfile& spt) const
 {
+  if (!this->IsPerfectRecall()) {
+    throw UndefinedException("Mixed strategies not supported for games with imperfect recall.");
+  }    
   return new TreeMixedStrategyProfileRep<double>(spt);
 }
 
-MixedStrategyProfile<Rational> GameTreeRep::NewMixedStrategyProfile(const Rational &, const StrategySupport& spt) const
+MixedStrategyProfile<Rational> GameTreeRep::NewMixedStrategyProfile(const Rational &, const StrategySupportProfile& spt) const
 {
+  if (!this->IsPerfectRecall()) {
+    throw UndefinedException("Mixed strategies not supported for games with imperfect recall.");
+  }    
   return new TreeMixedStrategyProfileRep<Rational>(spt);
 }
 
@@ -1090,9 +1101,12 @@ MixedStrategyProfile<Rational> GameTreeRep::NewMixedStrategyProfile(const Ration
 //========================================================================
 
 class TreePureStrategyProfileRep : public PureStrategyProfileRep {
+protected:
+  virtual PureStrategyProfileRep *Copy(void) const;
+
 public:
-  TreePureStrategyProfileRep(const Game &p_game);
-  virtual PureStrategyProfile Copy(void) const;
+  TreePureStrategyProfileRep(const Game &p_game)
+    : PureStrategyProfileRep(p_game) { }
   virtual void SetStrategy(const GameStrategy &);
   virtual GameOutcome GetOutcome(void) const
   { throw UndefinedException(); }
@@ -1106,18 +1120,9 @@ public:
 //              TreePureStrategyProfileRep: Lifecycle
 //------------------------------------------------------------------------
 
-TreePureStrategyProfileRep::TreePureStrategyProfileRep(const Game &p_nfg)
+PureStrategyProfileRep *TreePureStrategyProfileRep::Copy(void) const
 {
-  m_nfg = p_nfg;
-  m_profile = Array<GameStrategy>(m_nfg->NumPlayers());
-  for (int pl = 1; pl <= m_nfg->NumPlayers(); pl++)   {
-    m_profile[pl] = m_nfg->GetPlayer(pl)->GetStrategy(1);
-  }
-}
-
-PureStrategyProfile TreePureStrategyProfileRep::Copy(void) const
-{
-  return PureStrategyProfile(new TreePureStrategyProfileRep(*this));
+  return new TreePureStrategyProfileRep(*this);
 }
 
 PureStrategyProfile GameTreeRep::NewPureStrategyProfile(void) const
@@ -1136,7 +1141,7 @@ void TreePureStrategyProfileRep::SetStrategy(const GameStrategy &s)
 
 Rational TreePureStrategyProfileRep::GetPayoff(int pl) const
 {
-  PureBehavProfile behav(m_nfg);
+  PureBehaviorProfile behav(m_nfg);
   for (int i = 1; i <= m_nfg->NumPlayers(); i++) {
     GamePlayer player = m_nfg->GetPlayer(i);
     for (int iset = 1; iset <= player->NumInfosets(); iset++) {

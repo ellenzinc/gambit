@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/enumpoly.cc
 // Enumerates all Nash equilibria via support enumeration
@@ -35,7 +35,7 @@ bool g_verbose = false;
 void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Compute Nash equilibria by solving polynomial systems\n";
-  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "Heuristic search implementation Copyright (C) 2006, Litao Wei\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
 }
@@ -132,6 +132,9 @@ int main(int argc, char *argv[])
 
   try {
     Gambit::Game game = Gambit::ReadGame(*input_stream);
+    if (!game->IsPerfectRecall()) {
+      throw Gambit::UndefinedException("Computing equilibria of games with imperfect recall is not supported.");
+    }
 
     if (!game->IsTree() || useStrategic) {
       if (useHeuristic) {
@@ -147,12 +150,8 @@ int main(int argc, char *argv[])
     }
     return 0;
   }
-  catch (Gambit::InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

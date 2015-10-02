@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/gametree.h
 // Declaration of extensive game representation
@@ -32,7 +32,7 @@ class GameTreeRep;
 class GameTreeActionRep : public GameActionRep {
   friend class GameTreeRep;
   friend class GameTreeInfosetRep;
-  template <class T> friend class MixedBehavProfile;
+  template <class T> friend class MixedBehaviorProfile;
 
 private:
   int m_number;
@@ -61,7 +61,7 @@ class GameTreeInfosetRep : public GameInfosetRep {
   friend class GameTreeActionRep;
   friend class GamePlayerRep;
   friend class GameTreeNodeRep;
-  template <class T> friend class MixedBehavProfile;
+  template <class T> friend class MixedBehaviorProfile;
 
 protected:
   GameTreeRep *m_efg;
@@ -131,8 +131,8 @@ class GameTreeNodeRep : public GameNodeRep {
   friend class GameTreeActionRep;
   friend class GameTreeInfosetRep;
   friend class GamePlayerRep;
-  friend class PureBehavProfile;
-  template <class T> friend class MixedBehavProfile;
+  friend class PureBehaviorProfile;
+  template <class T> friend class MixedBehaviorProfile;
   
 protected:
   int number; 
@@ -231,6 +231,7 @@ public:
   //@{
   virtual bool IsTree(void) const { return true; }
   virtual bool IsConstSum(void) const;
+  using GameRep::IsPerfectRecall;
   virtual bool IsPerfectRecall(GameInfoset &, GameInfoset &) const;
   //@}
 
@@ -282,8 +283,8 @@ public:
   virtual PureStrategyProfile NewPureStrategyProfile(void) const;
   virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double) const;
   virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &) const; 
-  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupport&) const;
-  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupport&) const;
+  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupportProfile&) const;
+  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupportProfile&) const;
 
 };
 

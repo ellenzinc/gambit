@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //                          Albert Xin Jiang <albertjiang@gmail.com>
 //
 // FILE: src/libagg/agg.h
@@ -166,7 +166,7 @@ std::vector<projtype>& projTypes, int seed, bool int_payoffs=false, int int_fact
 
   AggNumber getPurePayoff(int player, int *s);
   inline void printPayoffs( ostream & s, int node){
-    s << payoffs[node].size()<<endl;
+    s << payoffs.at(node).size()<<endl;
     s << payoffs[node];
   }
 

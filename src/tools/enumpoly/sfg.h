@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/sfg.h
 // Interface to sequence form classes
@@ -31,7 +31,7 @@
 class Sfg  {
 private:
   Gambit::Game EF;
-  const Gambit::BehavSupport &efsupp;
+  const Gambit::BehaviorSupportProfile &efsupp;
   Gambit::Array<SFSequenceSet *> *sequences;
   gNArray<Gambit::Array<Gambit::Rational> *> *SF;  // sequence form
   Gambit::Array<Gambit::RectArray<Gambit::Rational> *> *E;   // constraint matrices for sequence form.  
@@ -44,7 +44,7 @@ private:
   void GetSequenceDims(const Gambit::GameNode &);
 
 public:
-  Sfg(const Gambit::BehavSupport &);
+  Sfg(const Gambit::BehaviorSupportProfile &);
   virtual ~Sfg();  
 
   inline int NumSequences(int pl) const {return seq[pl];}
@@ -63,7 +63,7 @@ public:
   Gambit::GameInfoset GetInfoset(int pl, int sequence) const;
   Gambit::GameAction GetAction(int pl, int sequence) const;
   const Gambit::Game &GetEfg(void) const {return EF;}
-  Gambit::MixedBehavProfile<double> ToBehav(const Gambit::PVector<double> &x) const;
+  Gambit::MixedBehaviorProfile<double> ToBehav(const Gambit::PVector<double> &x) const;
   const Sequence* GetSequence(int pl, int seq) const {return ((*sequences)[pl])->Find(seq);}
 
 };

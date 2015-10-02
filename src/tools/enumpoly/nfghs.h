@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, Litao Wei and The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, Litao Wei and The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/nfghs.h
 // Compute Nash equilibria via heuristic search on game supports
@@ -73,10 +73,10 @@ private:
   void GetDomainStrategies(Gambit::Array < Gambit::Array < Gambit::Array < GameStrategy > > > & domains,
 			   Gambit::Array < Gambit::Array < GameStrategy > > & domainStrategies);
 
-  bool IsConditionalDominatedBy(StrategySupport & dominatedGame, Gambit::Array < Gambit::Array < GameStrategy > > & domainStrategies,
+  bool IsConditionalDominatedBy(StrategySupportProfile & dominatedGame, Gambit::Array < Gambit::Array < GameStrategy > > & domainStrategies,
 				const GameStrategy &strategy, const GameStrategy &checkStrategy, bool strict);
 
-  bool IsConditionalDominated(StrategySupport & dominatedGame, 
+  bool IsConditionalDominated(StrategySupportProfile & dominatedGame,
 			      Gambit::Array<Gambit::Array<GameStrategy> > & domainStrategies,
 			      const GameStrategy &strategy, bool strict);
 

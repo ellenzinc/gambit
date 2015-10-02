@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/gt/nfggnm.cc
 // Gambit frontend to Gametracer global Newton method
@@ -74,7 +74,7 @@ void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Compute Nash equilibria using a global Newton method\n";
   p_stream << "Gametracer version 0.2, Copyright (C) 2002, Ben Blum and Christian Shelton\n";
-  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Gambit version " VERSION ", Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
 }
 
@@ -119,7 +119,7 @@ void Solve(const Gambit::Game &p_game)
     A = new nfgame(p_game->NumPlayers(), actions, payoffs);
   
     int *profile = new int[p_game->NumPlayers()];
-    for (Gambit::StrategyIterator iter(p_game); !iter.AtEnd(); iter++) {
+    for (Gambit::StrategyProfileIterator iter(p_game); !iter.AtEnd(); iter++) {
       for (int pl = 1; pl <= p_game->NumPlayers(); pl++) {
         profile[pl-1] = (*iter)->GetStrategy(pl)->GetNumber() - 1;
       }
@@ -248,15 +248,14 @@ int main(int argc, char *argv[])
 
   try {
     Gambit::Game game = Gambit::ReadGame(*input_stream);
+    if (!game->IsPerfectRecall()) {
+      throw Gambit::UndefinedException("Computing equilibria of games with imperfect recall is not supported.");
+    }
     Solve(game);
     return 0;
   }
-  catch (Gambit::InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

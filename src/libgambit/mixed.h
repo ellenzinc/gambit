@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/mixed.h
 // Declaration of mixed strategy profile classes
@@ -25,20 +25,24 @@
 
 #include "vector.h"
 #include "gameagg.h"
+#include "gamebagg.h"
 
 namespace Gambit {
 
 template <class T> class MixedStrategyProfileRep {
 public:
   Vector<T> m_probs;
-  StrategySupport m_support;
+  StrategySupportProfile m_support;
 
-  MixedStrategyProfileRep(const StrategySupport &);
+  MixedStrategyProfileRep(const StrategySupportProfile &);
   virtual ~MixedStrategyProfileRep() { }
   virtual MixedStrategyProfileRep<T> *Copy(void) const = 0;
 
   void SetCentroid(void);
-  /// Returns the probability the strategy is played
+  void Normalize(void);
+  void Randomize(void);
+  void Randomize(int p_denom);
+ /// Returns the probability the strategy is played
   const T &operator[](const GameStrategy &p_strategy) const
     { return m_probs[m_support.m_profileIndex[p_strategy->GetId()]]; }
   /// Returns the probability the strategy is played
@@ -53,10 +57,10 @@ public:
 template <class T> class TreeMixedStrategyProfileRep 
   : public MixedStrategyProfileRep<T> {
 public:
-  TreeMixedStrategyProfileRep(const StrategySupport &p_support)
+  TreeMixedStrategyProfileRep(const StrategySupportProfile &p_support)
     : MixedStrategyProfileRep<T>(p_support)
   { }
-  TreeMixedStrategyProfileRep(const MixedBehavProfile<T> &);
+  TreeMixedStrategyProfileRep(const MixedBehaviorProfile<T> &);
   virtual ~TreeMixedStrategyProfileRep() { }
   
   virtual MixedStrategyProfileRep<T> *Copy(void) const;
@@ -81,7 +85,7 @@ private:
   //@}
 
 public:
-  TableMixedStrategyProfileRep(const StrategySupport &p_support)
+  TableMixedStrategyProfileRep(const StrategySupportProfile &p_support)
     : MixedStrategyProfileRep<T>(p_support)
   { }
   virtual ~TableMixedStrategyProfileRep() { }
@@ -93,20 +97,37 @@ public:
 };
 
 template <class T> class AggMixedStrategyProfileRep
-    : public MixedStrategyProfileRep<T> {
+  : public MixedStrategyProfileRep<T> {
 
 public:
-    AggMixedStrategyProfileRep(const StrategySupport &p_support)
-      : MixedStrategyProfileRep<T>(p_support)
+  AggMixedStrategyProfileRep(const StrategySupportProfile &p_support)
+   : MixedStrategyProfileRep<T>(p_support)
     { }
-    virtual ~AggMixedStrategyProfileRep() { }
+  virtual ~AggMixedStrategyProfileRep() { }
 
-    virtual MixedStrategyProfileRep<T> *Copy(void) const{
-  	  return new AggMixedStrategyProfileRep(*this);
-    }
-    virtual T GetPayoff(int pl) const;
-    virtual T GetPayoffDeriv(int pl, const GameStrategy &) const;
-    virtual T GetPayoffDeriv(int pl, const GameStrategy &, const GameStrategy &) const;
+  virtual MixedStrategyProfileRep<T> *Copy(void) const {
+    return new AggMixedStrategyProfileRep(*this);
+  }
+  virtual T GetPayoff(int pl) const;
+  virtual T GetPayoffDeriv(int pl, const GameStrategy &) const;
+  virtual T GetPayoffDeriv(int pl, const GameStrategy &, const GameStrategy &) const;
+};
+
+template <class T> class BagentMixedStrategyProfileRep
+  : public MixedStrategyProfileRep<T> {
+
+public:
+  BagentMixedStrategyProfileRep(const StrategySupportProfile &p_support)
+    : MixedStrategyProfileRep<T>(p_support)
+    { }
+  virtual ~BagentMixedStrategyProfileRep() { }
+
+  virtual MixedStrategyProfileRep<T> *Copy(void) const {
+    return new BagentMixedStrategyProfileRep(*this);
+  }
+  virtual T GetPayoff(int pl) const;
+  virtual T GetPayoffDeriv(int pl, const GameStrategy &) const;
+  virtual T GetPayoffDeriv(int pl, const GameStrategy &, const GameStrategy &) const;
 };
 
 /// \brief A probability distribution over strategies in a game
@@ -115,14 +136,16 @@ public:
 /// independently chooses from among his strategies with specified
 /// probabilities.
 template <class T> class MixedStrategyProfile {
-  friend class StrategySupport;
+  friend class StrategySupportProfile;
   friend class TreeMixedStrategyProfileRep<T>;
   friend class AggMixedStrategyProfileRep<T>;
+  friend class BagentMixedStrategyProfileRep<T>;
   friend class TableMixedStrategyProfileRep<T>;
   friend class GameAggRep;
+  friend class GameBagentRep;
   friend class GameTableRep;
   friend class GameTreeRep;
-  friend class MixedBehavProfile<T>;
+  friend class MixedBehaviorProfile<T>;
 private:
   MixedStrategyProfileRep<T> *m_rep;
 
@@ -130,7 +153,7 @@ private:
     : m_rep(p_rep)
   { }
   /// Convert a behavior strategy profile to a mixed strategy profile
-  MixedStrategyProfile(const MixedBehavProfile<T> &);
+  MixedStrategyProfile(const MixedBehaviorProfile<T> &);
 
 public:
   /// @name Lifecycle
@@ -166,6 +189,9 @@ public:
   T &operator[](const GameStrategy &p_strategy)
     { return m_rep->operator[](p_strategy); }
 
+  /// Returns the mixed strategy for the player
+  Vector<T> operator[](const GamePlayer &p_player) const;
+
   operator const Vector<T> &(void) const { return m_rep->m_probs; }
   operator Vector<T> &(void) { return m_rep->m_probs; }
   //@}
@@ -175,16 +201,29 @@ public:
   /// Returns the game on which the profile is defined
   Game GetGame(void) const { return m_rep->m_support.GetGame(); }
   /// Returns the support on which the profile is defined
-  const StrategySupport &GetSupport(void) const { return m_rep->m_support; }
+  const StrategySupportProfile &GetSupport(void) const { return m_rep->m_support; }
 
   /// Sets all strategies for each player to equal probabilities
   void SetCentroid(void) { m_rep->SetCentroid(); }
+
+  /// Normalize each player's strategy probabilities so they sum to one
+  void Normalize(void) { m_rep->Normalize(); }
+
+  /// Generate a random mixed strategy profile according to the uniform distribution
+  void Randomize(void) { m_rep->Randomize(); }
+
+  /// Generate a random mixed strategy profile according to the uniform distribution
+  /// on a grid with spacing p_denom
+  void Randomize(int p_denom) { m_rep->Randomize(p_denom); }
 
   /// Returns the total number of strategies in the profile
   int MixedProfileLength(void) const { return m_rep->m_probs.Length(); }
 
   /// Converts the profile to one on the full support of the game
   MixedStrategyProfile<T> ToFullSupport(void) const;
+
+  /// Converts the profile to one on the unrestricted parent of the game
+  MixedStrategyProfile<T> Unrestrict(void) const;
   //@}
 
   /// @name Computation of interesting quantities

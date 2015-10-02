@@ -1,13 +1,15 @@
 .. _python-api:
 
+.. py:module:: gambit
+
+
 Python interface to Gambit library
 ==================================
 
-As of the Gambit release of 0.2013.07.01, Gambit now supports a Python
-interface for programmatic manipulation of games.  This section
-documents this interface, which is under active development.
-Refer to the :ref:`instructions for building the Python interface
-<build-python>` to compile and install the Python extension.
+Gambit provides a Python interface for programmatic manipulation of
+games.  This section documents this interface, which is under active
+development.  Refer to the :ref:`instructions for building the Python
+interface <build-python>` to compile and install the Python extension.
 
 
 A tutorial introduction
@@ -16,17 +18,17 @@ A tutorial introduction
 Building an extensive game
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The function :func:`gambit.new_tree` creates a new, trivial extensive game,
-with no players, and only a root node::
+The function :py:func:`Game.new_tree` creates a new, trivial
+extensive game, with no players, and only a root node::
 
   In [1]: import gambit
 
-  In [2]: g = gambit.new_tree()
+  In [2]: g = gambit.Game.new_tree()
 
   In [3]: len(g.players)
   Out[3]: 0
 
-The game also has no title.  The :py:attr:`title` attribute provides
+The game also has no title.  The :py:attr:`~Game.title` attribute provides
 access to a game's title::
 
   In [4]: str(g)
@@ -40,23 +42,25 @@ access to a game's title::
   In [7]: str(g)
   Out[7]: "<Game 'A simple poker example'>"
 
-The :py:attr:`players` attribute of a game is a collection of the
-players.  As seen above, calling :py:meth:`len` on the set of players
-gives the number of players in the game.  Adding a player is done
-with the :py:meth:`add` member of :py:attr:`players`::
+The :py:attr:`~Game.players` attribute of a game is a collection of
+the players.  As seen above, calling :py:meth:`len` on the set of
+players gives the number of players in the game.  Adding a
+:py:class:`Player` to the game is done with the :py:meth:`add` member
+of :py:attr:`~Game.players`::
 
   In [8]: p = g.players.add("Alice")
 
   In [9]: p
   Out[9]: <Player [0] 'Alice' in game 'A simple poker example'>
 
-Each player has a text string stored in the :py:attr:`label` attribute,
-which is useful for human identification of players::
+Each :py:class:`Player` has a text string stored in the
+:py:attr:`~Player.label` attribute, which is useful for human
+identification of players::
 
   In [10]: p.label
   Out[10]: 'Alice'
 
-The :py:attr:`players` can be accessed like a Python list::
+:py:attr:`Game.players` can be accessed like a Python list::
 
   In [11]: len(g.players)
   Out[11]: 1
@@ -71,11 +75,11 @@ The :py:attr:`players` can be accessed like a Python list::
 Building a strategic game
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Games in strategic form are created using :func:`gambit.new_table`, which
+Games in strategic form are created using :py:func:`Game.new_table`, which
 takes a list of integers specifying the number of strategies for
 each player::
 
-  In [1]: g = gambit.new_table([2,2])
+  In [1]: g = gambit.Game.new_table([2,2])
 
   In [2]: g.title = "A prisoner's dilemma game"
 
@@ -96,7 +100,7 @@ each player::
   }
   0 0 0 0 
 
-The :attr:`strategies` collection for a player lists all the
+The :py:attr:`~Player.strategies` collection for a :py:class:`Player` lists all the
 strategies available for that player::
 
   In [6]: g.players[0].strategies
@@ -144,15 +148,22 @@ betrayal payoff is 10, the sucker payoff is 2, and the noncooperative
 
   In [19]: g[1,1][1] = 5
 
+Alternatively, one can use :py:func:`Game.from_arrays` in conjunction
+with numpy arrays to construct a game with desired payoff matrices
+more directly, as in::
+
+  In [20]: m = numpy.array([ [ 8, 2 ], [ 10, 5 ] ], dtype=gambit.Rational)
+ 
+  In [21]: g = gambit.Game.from_arrays(m, numpy.transpose(m))
 
 
 Reading a game from a file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Games stored in existing Gambit savefiles in either the .efg or .nfg
-formats can be loaded using :func:`gambit.read_game`::
+formats can be loaded using :py:func:`Game.read_game`::
 
-  In [1]: g = gambit.read_game("e02.nfg")
+  In [1]: g = gambit.Game.read_game("e02.nfg")
 
   In [2]: g
   Out[2]: 
@@ -178,11 +189,11 @@ Iterating the pure strategy profiles in a game
 
 Each entry in a strategic game corresponds to the outcome arising from
 a particular combination fo pure strategies played by the players.
-The property :attr:`gambit.Gambit.contingencies` is the collection of
+The property :py:attr:`Game.contingencies` is the collection of
 all such combinations.  Iterating over the contingencies collection
 visits each pure strategy profile possible in the game::
 
-   In [1]: g = gambit.read_game("e02.nfg")
+   In [1]: g = gambit.Game.read_game("e02.nfg")
 
    In [2]: list(g.contingencies)
    Out[2]: [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1]]
@@ -201,32 +212,29 @@ outcomes and payoffs in the game::
    [2, 1] 2 0
 
 
+Mixed strategy and behavior profiles
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+A :py:class:`MixedStrategyProfile` object, which represents a probability
+distribution over the pure strategies of each player, is constructed
+using :py:meth:`Game.mixed_strategy_profile`.  Mixed strategy
+profiles are initialized to uniform randomization over all strategies
+for all players.
 
+Mixed strategy profiles can be indexed in three ways. 
 
+#. Specifying a strategy returns the probability of that strategy
+   being played in the profile.
+#. Specifying a player returns a list of probabilities, one for each
+   strategy available to the player.
+#. Profiles can be treated as a list indexed from 0 up to the number
+   of total strategies in the game minus one.
 
+This sample illustrates the three methods::
 
+  In [1]: g = gambit.Game.read_game("e02.nfg")
 
-Mixed strategies
-~~~~~~~~~~~~~~~~
-
-A mixed strategy object, which represents a probability distribution
-over the pure strategies of a player, can be obtained using the
-:meth:`gambit.Game.mixed_profile` method on a :class:`gambit.Game`
-object.  Mixed strategies are initialized to uniform randomization
-over all strategies for all players.
-
-Mixed strategies can be indexed in three ways. Specifying a strategy
-returns the probability of that strategy being played in the profile.
-Specifying a player returns a list of probabilities, one for each
-strategy available to the player.  Finally, mixed strategies can be
-treated as a list indexed from 0 up to the number of total strategies
-in the game minus one.  This latter behavior allows :py:func:`list` to
-work as expected on a mixed strategy object::
-
-  In [1]: g = gambit.read_game("e02.nfg")
-
-  In [2]: p = g.mixed_profile()
+  In [2]: p = g.mixed_strategy_profile()
 
   In [3]: list(p)
   Out[3]: [0.33333333333333331, 0.33333333333333331, 0.33333333333333331, 0.5, 0.5]
@@ -238,27 +246,78 @@ work as expected on a mixed strategy object::
   Out[5]: 0.5
 
 The expected payoff to a player is obtained using
-:meth:`gambit.MixedProfile.payoff`::
+:py:meth:`MixedStrategyProfile.payoff`::
 
   In [6]: p.payoff(g.players[0])
   Out[6]: 0.66666666666666663
 
 The standalone expected payoff to playing a given strategy, assuming
 all other players play according to the profile, is obtained using
-:meth:`gambit.MixedProfile.strategy_value`::
+:py:meth:`MixedStrategyProfile.strategy_value`::
 
   In [7]: p.strategy_value(g.players[0].strategies[2])
   Out[7]: 1.0
 
+A :py:class:`MixedBehaviorProfile` object, which represents a probability
+distribution over the actions at each information set, is constructed
+using :py:meth:`Game.mixed_behavior_profile`.  Behavior profiles are
+initialized to uniform randomization over all actions at each
+information set.
+
+Mixed behavior profiles are indexed similarly to mixed strategy
+profiles, except that indexing by a player returns a list of lists of
+probabilities, containing one list for each information set controlled
+by that player::
+
+  In [1]: g = gambit.Game.read_game("e02.efg")
+
+  In [2]: p = g.mixed_behavior_profile()
+
+  In [3]: list(p)
+  Out[3]: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+  In [5]: p[g.players[0]]
+  Out[5]: [[0.5, 0.5], [0.5, 0.5]]
+
+  In [6]: p[g.players[0].infosets[0]]
+  Out[6]: [0.5, 0.5]
+
+  In [7]: p[g.players[0].infosets[0].actions[0]]
+  Out[7]: 0.5
+
+For games with a tree representation, a
+:py:class:`MixedStrategyProfile` can be converted to its equivalent
+:py:class:`MixedBehaviorProfile` by calling
+:py:func:`MixedStrategyProfile.as_behavior`. Equally, a
+:py:class:`MixedBehaviorProfile` can be converted to an equivalent
+:py:class:`MixedStrategyProfile` using :py:func:`MixedBehaviorProfile.as_strategy`.
+
 
 Computing Nash equilibria
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Interfaces to algorithms for computing Nash equilibria are collected
-in the module :mod:`gambit.nash`.  Each algorithm is encapsulated in
-its own class.
+in the module :py:mod:`gambit.nash`.  There are two choices for
+calling these algorithms: directly within Python, or via the
+corresponding Gambit :ref:`command-line tool <command-line>`.
 
-Algorithms with the word "External" in the class name operate by
+Calling an algorithm directly within Python has less overhead, which
+makes this approach well-suited to the analysis of smaller games,
+where the expected running time is small.  In addition, these
+interfaces may offer more fine-grained control of the behavior
+of some algorithms.  
+
+Calling the Gambit command-line tool launches the algorithm as a
+separate process.  This makes it easier to abort during the run of the
+algorithm (preserving where possible the equilibria which have already
+been found), and also makes the program more robust to any internal
+errors which may arise in the calculation.
+
+Calling command-line tools
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The interface to each command-line tool is encapsulated in a class
+with the word "External" in the name.  These operate by
 creating a subprocess, which calls the corresponding Gambit
 :ref:`command-line tool <command-line>`.  Therefore, a working
 Gambit installation needs to be in place, with the command-line tools
@@ -279,13 +338,13 @@ gambit-ipa                ExternalIteratedPolymatrixSolver
 gambit-logit              ExternalLogitSolver
 ======================    ========================
 
-For example, consider the game e02.nfg from the set of standard
+For example, consider the game :file:`e02.nfg` from the set of standard
 Gambit examples.  This game has a continuum of equilibria, in which
 the first player plays his first strategty with probability one,
 and the second player plays a mixed strategy, placing at least
 probability one-half on her first strategy::
 
-  In [1]: g = gambit.read_game("e02.nfg")
+  In [1]: g = gambit.Game.read_game("e02.nfg")
 
   In [2]: solver = gambit.nash.ExternalEnumPureSolver()
 
@@ -314,10 +373,10 @@ player randomizes with equal probability on both strategies.
 When a game's representation is in extensive form, these solvers
 default to using the version of the algorithm which operates on the
 extensive game, where available, and returns a list of
-:py:class:`gambit.BehavProfile` objects.  This can be overridden when
+:py:class:`gambit.MixedBehaviorProfile` objects.  This can be overridden when
 calling :py:meth:`solve` via the ``use_strategic`` parameter::
 
-  In [1]: g = gambit.read_game("e02.efg")
+  In [1]: g = gambit.Game.read_game("e02.efg")
 
   In [2]: solver = gambit.nash.ExternalLCPSolver()
 
@@ -328,58 +387,100 @@ calling :py:meth:`solve` via the ``use_strategic`` parameter::
   Out[4]: [<NashProfile for 'Selten (IJGT, 75), Figure 2': [1.0, 0.0, 0.0, 1.0, 0.0]>]
 
 As this game is in extensive form, in the first call, the returned
-profile is a :py:class:`gambit.BehavProfile`, while in the second, it
-is a :py:class:`gambit.MixedProfile`.  While the set of equilibria is
+profile is a :py:class:`MixedBehaviorProfile`, while in the second, it
+is a :py:class:`MixedStrategyProfile`.  While the set of equilibria is
 not affected by whether behavior or mixed strategies are used, the
 equilibria returned by specific solution methods may differ, when
 using a call which does not necessarily return all equilibria.
 
-It is also possible to convert between mixed and behavior strategic
-profiles using :meth:`gambit.MixedProfile.as_behav` and 
-:meth:`gambit.BehavProfile.as_mixed`.
+Calling internally-linked libraries
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Where available, versions of algorithms which have been linked
+internally into the Python library are generally called via
+convenience functions.  The following table lists the algorithms
+available via this approach.
 
-Hashing and game objects
-------------------------
+========================================  ========================
+Method                                    Python function
+========================================  ========================
+:ref:`gambit-enumpure <gambit-enumpure>`  :py:func:`gambit.nash.enumpure_solve`
+:ref:`gambit-lp <gambit-lp>`              :py:func:`gambit.nash.lp_solve`
+:ref:`gambit-lcp <gambit-lcp>`            :py:func:`gambit.nash.lcp_solve`
+========================================  ========================
 
-Games, and objects representing elements within games, have a hash
-method defined and are therefore hashable, usable as keys in
-dictionaries and in Python sets.  The hash value is generated based on
-the memory address at which the underlying C++ object is stored.  This
-meets the requirements of a Python hash value, as distinct objects
-will generate distinct hash values.  However, the hash value generated
-will vary in different runs of a program.  As such, operations which
-depend on the sequence of the has value may generate different output
-in different runs of the program, most notably popping from a set, or
-iterating over the keys in a dictionary where the keys are game objects.
+Parameters are available to modify the operation of the algorithm.
+The most common ones are ``use_strategic``, to indicate the use of a
+strategic form version of an algorithm where both extensive and
+strategic versions are available, and ``rational``, to indicate
+computation using rational arithmetic, where this is an option to the
+algorithm.
+
+For example, taking again the game :file:`e02.efg` as an example::
+
+  In [1]: g = gambit.Game.read_game("e02.efg")
+
+  In [2]: gambit.nash.lcp_solve(g)
+  Out[2]: [[1.0, 0.0, 0.5, 0.5, 0.5, 0.5]]
+
+  In [3]: gambit.nash.lcp_solve(g, rational=True)
+  Out[3]: [[Fraction(1, 1), Fraction(0, 1), Fraction(1, 2), Fraction(1, 2), Fraction(1, 2), Fraction(1, 2)]]
+
+  In [4]: gambit.nash.lcp_solve(g, use_strategic=True)
+  Out[4]: [[1.0, 0.0, 0.0, 1.0, 0.0]]
+
+  In [5]: gambit.nash.lcp_solve(g, use_strategic=True, rational=True)
+  Out[5]: [[Fraction(1, 1), Fraction(0, 1), Fraction(0, 1), Fraction(1, 1), Fraction(0, 1)]]
 
 
 
 API documentation
 -----------------
 
-.. py:module:: gambit
-
-.. py:function:: new_tree()
-
-   Creates a new :py:class:`gambit.Game`
-   consisting of a trivial game tree, with one
-   node, which is both root and terminal, and no players.
-
-.. py:function:: new_table(dim)
-
-   Creates a new :py:class:`gambit.Game` with a strategic
-   representation.  The parameter `dim` is a list of the number of
-   strategies for each player.
-
-.. py:function:: read_game(fn)
-
-   Creates a new :py:class:`gambit.Game` by reading in the
-   contents of the file named `fn`.
+Game representations
+~~~~~~~~~~~~~~~~~~~~
 
 .. py:class:: Game
 
    An object representing a game, in extensive or strategic form.
+
+   .. py:classmethod:: new_tree()
+
+      Creates a new :py:class:`Game`
+      consisting of a trivial game tree, with one
+      node, which is both root and terminal, and no players.
+
+   .. py:classmethod:: new_table(dim)
+ 
+      Creates a new :py:class:`Game` with a strategic
+      representation. 
+
+      :param dim: A list specifying the number of strategies for each player.
+
+   .. py:classmethod:: from_arrays(*arrays)
+
+      Creates a new :py:class:`Game` with a strategic representation.
+      Each entry in arrays is a numpy array giving the payoff matrix for the
+      corresponding player.  The arrays must all have the same shape,
+      and have the same number of dimensions as the total number of players.
+      
+   .. py:classmethod:: read_game(fn)
+
+      Constructs a game from its serialized representation in a file.
+      See :ref:`file-formats` for details on recognized formats.
+
+      :param file fn: The path to the file to open
+      :raises IOError: if the file cannot be opened, or does not contain
+	   	       a valid game representation
+
+   .. py:classmethod:: parse_game(s)
+
+      Constructs a game from its seralized representation in a string.	
+      See :ref:`file-formats` for details on recognized formats.
+
+      :param str s: The string containing the serialized representation
+      :raises IOError: if the string does not contain a valid game
+		       representation
 
    .. py:attribute:: is_tree
 
@@ -395,27 +496,24 @@ API documentation
 
    .. py:attribute:: actions
 
-      Returns a :py:class:`gambit.GameActions` collection object
-      representing the actions defined in the game.
+      Returns a list-like object representing the actions defined in the game.
 
-      :raises: :py:class:`gambit.UndefinedOperationError` if the game does not have a tree representation.
+      :raises gambit.UndefinedOperationError: if the game does not have a tree representation.
 
    .. py:attribute:: infosets
 
-      Returns a :py:class:`gambit.GameInfosets` collection object
-      representing the information sets defined in the game.
+      Returns a list-like object representing the information sets defined in the game.
       
-      :raises: :py:class:`gambit.UndefinedOperationError` if the game does not have a tree representation.
+      :raises gambit.UndefinedOperationError: if the game does not have a tree representation.
 
    .. py:attribute:: players
  
-      Returns a :py:class:`gambit.Players` collection object
+      Returns a :py:class:`Players` collection object
       representing the players defined in the game.
 
    .. py:attribute:: strategies
 
-      Returns a :py:class:`gambit.GameStrategies` collection object
-      representing the strategies defined in the game.
+      Returns a list-like object representing the strategies defined in the game.
 
    .. py:attribute:: contingencies
 
@@ -424,10 +522,10 @@ API documentation
 
    .. py:attribute:: root
 
-      Returns the :py:class:`gambit.Node` representing the root
+      Returns the :py:class:`Node` representing the root
       node of the game.
 
-      :raises: :py:class:`gambit.UndefinedOperationError` if the game does not have a tree representation.
+      :raises: :py:class:`UndefinedOperationError` if the game does not have a tree representation.
 
    .. py:attribute:: is_const_sum
 
@@ -447,30 +545,38 @@ API documentation
 
    .. py:method:: __getitem__(profile)
 
-      Returns the :py:class:`gambit.Outcome` associated with a
-      profile of pure strategies.  :literal:`profile` is a list
-      of integers specifying the strategy number each player plays
-      in the profile.
+      Returns the :py:class:`Outcome` associated with a
+      profile of pure strategies. 
 
-   .. py:method:: mixed_profile(rational=False)
+      :param profile: A list of integers specifying the strategy
+                      number each player plays in the profile.
 
-      Returns a mixed strategy profile :py:class:`gambit.MixedProfile`
+   .. py:method:: mixed_strategy_profile(rational=False)
+
+      Returns a mixed strategy profile :py:class:`MixedStrategyProfile`
       over the game, initialized to uniform randomization for each
       player over his strategies.  If the game has a tree
       representation, the mixed strategy profile is defined over the
       reduced strategic form representation.
       
-      :param rational: If :literal:`True`, probabilities are represented using rational numbers; otherwise double-precision floating point numbers are used.  
+      :param rational: If :literal:`True`, probabilities are
+                       represented using rational numbers; otherwise
+                       double-precision floating point numbers are
+                       used.
 
-   .. py:method:: behav_profile(rational=False)
+   .. py:method:: mixed_behavior_profile(rational=False)
 
       Returns a behavior strategy profile
-      :py:class:`gambit.BehavProfile` over the game, initialized to
+      :py:class:`MixedBehaviorProfile` over the game, initialized to
       uniform randomization for each player over his actions at each
       information set. 
 
-      :param rational: If :literal:`True`, probabilities are represented using rational numbers; otherwise double-precision floating point numbers are used.  
-      :raises: :py:class:`gambit.UndefinedOperationError` if the game does not have a tree representation.
+      :param rational: If :literal:`True`, probabilities are
+                       represented using rational numbers; otherwise
+                       double-precision floating point numbers are
+                       used.
+      :raises UndefinedOperationError: if the game
+				       does not have a tree representation.
 
    .. py:method:: write(format='native')
 
@@ -489,438 +595,115 @@ API documentation
       * `native`: The format most appropriate to the
         underlying representation of the game, i.e., `efg` or `nfg`.
 
-.. py:class:: GameActions
-   
-   A collection object representing the actions of a game.
+.. py:class:: StrategicRestriction
 
-   .. py:method:: len()
+   A read-only view on a :py:class:`Game`, defined by a subset
+   of the strategies on the original game.
 
-      Returns the number of actions in the game.
+   In addition to the members described here, a StrategicRestriction
+   implements the interface of a :py:class:`Game`, although
+   operations which change the content of the game will raise an
+   exception.
 
-   .. py:method:: __getitem__(i)
+   .. py:method:: unrestrict()
 
-      Returns action number ``i`` in the game.  Actions are numbered
-      starting with ``0``.
+      Returns the :py:class:`Game` object on which the
+      restriction was based.
 
-.. py:class:: GameInfosets
-   
-   A collection object representing the information sets of a game.
 
-   .. py:method:: len()
+Representations of play of games
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-      Returns the number of information sets in the game.
+The main responsibility of these classes is to capture information
+about a plan of play of a game, by one or more players.
 
-   .. py:method:: __getitem__(i)
+.. py:class:: StrategySupportProfile
 
-      Returns information set number ``i`` in the game.  Information sets
-      are numbered starting with ``0``.
-
-.. py:class:: GameStrategies
-   
-   A collection object representing the strategies of a game.
-
-   .. py:method:: len()
-
-      Returns the number of strategies in the game.
-
-   .. py:method:: __getitem__(i)
-
-      Returns strategy ``i`` in the game.  Strategies are numbered
-      starting with ``0``.
-
-.. py:class:: Infoset
-
-   An information set for an extensive form game.
-
-   .. py:method:: precedes(node)
-
-      Returns ``True`` or ``False`` depending on whether the specified node
-      precedes the information set in the extensive game. 
-
-   .. py:method:: reveal(player)
-
-      Reveals the information set to a player.
-
-   .. py:attribute:: actions
-
-      Returns a :py:class:`gambit.Actions` collection object representing 
-      the actions defined in this information set.
-
-   .. py:attribute:: label
-
-      A text label used to identify the information set.
-
-   .. py:attribute:: is_chance
-
-      Returns ``True`` or ``False`` depending on whether this information set is
-      associated to the chance player.
-
-   .. py:attribute:: members
-
-      Returns the set of nodes associated with this information set.
-
-   .. py:attribute:: player
-
-      Returns the player object associated with this information set.
-
-.. py:class:: Infosets
-   
-   A collection object representing the information sets available to a
-   player in a game.
-
-   .. py:method:: len()
-
-      Returns the number of information sets for the player.
-
-   .. py:method:: __getitem__(i)
-
-      Returns information set number ``i``.  Information sets are numbered
-      starting with ``0``.
-
-.. py:class:: Action
-
-   An action associated with an information set.
-
-   .. py:method:: delete()
-
-      Deletes this action from the game.
-
-      :raises: :py:class:`gambit.UndefinedOperationError` when the action is the last one of its infoset.
-
-   .. py:method:: precedes(node)
-
-      Returns ``True`` or ``False`` depending on whether the specified node
-      precedes the action in the extensive game. 
-
-   .. py:attribute:: label
-
-      A text label used to identify the action.
-
-   .. py:attribute:: infoset
-
-      Returns the information to which this action is associated.
-
-   .. py:attribute:: prob
-
-      A settable property that represents the probability associated 
-      with the action. It can be a value stored as an int, 
-      decimal.Decimal, or Fraction.fraction. 
-
-.. py:class:: Players
-   
-   A collection object representing the players in a game.
-
-   .. py:method:: len()
-
-      Returns the number of players in the game.
-
-   .. py:method:: __getitem__(i)
-
-      Returns player number ``i`` in the game.  Players are numbered
-      starting with ``0``.
-
-   .. py:attribute:: chance
-
-      Returns the player representing all chance moves in the game.
-
-   .. py:method:: add([label=""])
-
-      Add a :py:class:`gambit.Player` to the game.  If label
-      is specified, sets the text label for the player. In the case
-      of extensive games this will create a new player with no 
-      moves. In the case of strategic form games it creates a player
-      with one strategy. If the provided player label is shared by
-      another player a warning will be returned.
-
-.. py:class:: Player
-
-   Represents a player in a :py:class:`gambit.Game`.
+   A set-like object representing a subset of the strategies in a
+   game.  It incorporates the restriction that each player must have
+   at least one strategy.
 
    .. py:attribute:: game
 
-      Returns the :py:class:`gambit.Game` in which the player is.
+      Returns the :py:class:`Game` on which the support
+      profile is defined.
 
-   .. py:attribute:: label
+   .. py:method:: issubset(other)
 
-      A text label useful for identification of the player.
+      Returns :literal:`True` if this profile is a subset of
+      `other`.
 
-   .. py:attribute:: number
+      :param StrategySupportProfile other: another support profile
 
-      Returns the number of the player in the :py:class:`gambit.Game`.
-      Players are numbered starting with ``0``.
+   .. py:method:: issuperset(other)
 
-   .. py:attribute:: is_chance
+      Returns :literal:`True` if this profile is a superset of
+      `other`.
 
-      Returns ``True`` or ``False`` on whether the player represents the chance 
-      moves or not.
+      :param StrategySupportProfile other: another support profile
 
-   .. py:attribute:: infosets
+   .. py:method:: restrict()
 
-      Returns a :py:class:`gambit.Infosets` collection object
-      representing the information sets of the player.
+      Creates a :py:class:`StrategicRestriction` object,
+      which defines a restriction of the game in which only the
+      strategies in this profile are present.
 
-   .. py:attribute:: strategies
+   .. py:method:: remove(strategy)
 
-      Returns a :py:class:`gambit.Strategies` collection object
-      representing the strategies of the player.
+      Modifies the support profile by removing the specified strategy.
 
-   .. py:attribute:: min_payoff
+      :param Strategy strategy: the strategy to remove
+      :raises UndefinedOperationError: if attempting to remove the
+				       last strategy for a player
 
-      Returns the smallest payoff for the player in any outcome of the game.
+   .. py:method:: difference(other)
 
-   .. py:attribute:: max_payoff
+      Returns a new support profile containing all the strategies
+      which are present in this profile, but not in `other`.
 
-      Returns the largest payoff for the player in any outcome of the game.
+      :param StrategySupportProfile other: another support profile
 
-.. py:class:: Node
+   .. py:method:: intersection(other)
 
-   Represents a node in a :py:class:`gambit.Game`.
+      Returns a new support profile containing all the strategies
+      present in both this profile and in `other`.
 
-   .. py:method:: is_successor_of(node)
+      :param StrategySupportProfile other: another support profile
 
-      Returns ``True`` if the current node is a successor of the
-      node provided in the argument list.
-
-   .. py:method:: is_subgame_root(node)
-
-      Returns ``True`` if the current node is a marked subgame root.
-
-   .. py:attribute:: label
-
-      A text label useful for identification of the node.
-
-   .. py:attribute:: is_terminal
-
-      Returns ``True`` if the node is a terminal node in the game tree.
-      Returns ``False`` otherwise.
-
-   .. py:attribute:: children
-
-      Returns a collection of the current node's children.
-
-   .. py:attribute:: game
-
-      Returns the :py:class:`gambit.Game` associated with the 
-      current node.
-
-   .. py:attribute:: infoset
-
-      Returns the :py:class:`gambit.Infoset` associated with the 
-      current node.
-
-   .. py:attribute:: player
-
-      Returns the :py:class:`gambit.Player` associated with the 
-      current node.
-
-   .. py:attribute:: parent
-
-      Returns the :py:class:`gambit.Node` that is the parent of 
-      the current node.
-
-   .. py:attribute:: prior_action
-
-      Returns the action prior to the current node.
-
-   .. py:attribute:: prior_sibling
-
-      Returns the :py:class:`gambit.Node` that is prior to the 
-      current node at the same level of the game tree.
-
-   .. py:attribute:: next_sibling
-
-      Returns the :py:class:`gambit.Node` that is prior to the 
-      current node at the same level of the game tree.
-
-   .. py:attribute:: outcome
-
-      Returns the :py:class:`gambit.Outcome` that is associated 
-      with the current node.
-
-   .. py:method:: append_move(infoset[ , actions])
-
-      Add a move to a terminal node, at the :py:class:`gambit.Infoset`
-      ``infoset``.  Alternatively, a :py:class:`gambit.Player` can be
-      passed as the information set, in which case the move is placed
-      in a new information set for that player; in this instance, the
-      number of ``actions`` at the new information set must be specified.
-
-      :raises: :py:class:`gambit.UndefinedOperationError` when called on a non-terminal node.
-      :raises: :py:class:`gambit.UndefinedOperationError` when called with a :py:class:`gambit.Player` object and no actions, or actions < 1.
-      :raises: :py:class:`gambit.UndefinedOperationError` when called with a :py:class:`gambit.Infoset` object and with actions.
-      :raises: :py:class:`gambit.MismatchError` when called with objects from different games.
-
-   .. py:method:: insert_move(infoset[ , actions])
-
-      Insert a move at a node, at the :py:class:`gambit.Infoset`
-      ``infoset``.  Alternatively, a :py:class:`gambit.Player` can be
-      passed as the information set, in which case the move is placed
-      in a new information set for that player; in this instance, the
-      number of ``actions`` at the new information set must be specified.
-      The newly-inserted node takes the place of the node in the game
-      tree, and the existing node becomes the first child of the new node.
-
-      :raises: :py:class:`gambit.UndefinedOperationError` when called with a :py:class:`gambit.Player` object and no actions, or actions < 1.
-      :raises: :py:class:`gambit.UndefinedOperationError` when called with a :py:class:`gambit.Infoset` object and with actions.
-      :raises: :py:class:`gambit.MismatchError` when called with objects from different games.
-
-   .. py:method:: leave_infoset()
-
-      Removes this node from its information set. If this node is the last
-      of its information set, this method does nothing.
-
-   .. py:method:: delete_parent()
-
-      Deletes the parent node and its subtrees other than the one 
-      which contains this node and moves this node into its former 
-      parent's place.
-
-   .. py:method:: delete_tree()
-
-      Deletes the whole subtree which has this node as a root, except 
-      the actual node.
-
-   .. py:method:: copy_tree(node)
-
-      Copies the tree of this node to ``node``.
-
-      :raises: :literal:`MismatchError` if both objects aren't in the same game.
-
-   .. py:method:: move_tree(node)
-
-      Move the tree of this node to ``node``.
-
-      :raises: :literal:`MismatchError` if both objects aren't in the same game.
-
-.. py:class:: Actions
+   .. py:method:: union(other)
    
-   A collection object representing the actions available at an
-   information set in a game.
+      Returns a new support profile containing all the strategies
+      present in this profile, in `other`, or in both.
 
-   .. py:method:: len()
+      :param StrategySupportProfile other: another support profile
 
-      Returns the number of actions for the player.
+.. py:class:: MixedStrategyProfile
 
-   .. py:method:: __getitem__(i)
-
-      Returns action number ``i``.  Actions are numbered
-      starting with ``0``.
-
-   .. py:method:: add([action=None])
-
-      Add a :py:class:`gambit.Action` to the list of actions of an 
-      information set.
-
-.. py:class:: Strategies
-   
-   A collection object representing the strategies available to a
-   player in a game.
-
-   .. py:method:: len()
-
-      Returns the number of strategies for the player.
-
-   .. py:method:: __getitem__(i)
-
-      Returns strategy number ``i``.  Strategies are numbered
-      starting with ``0``.
-
-   .. py:method:: add([label=""])
-
-      Add a :py:class:`gambit.Strategy` to the player's list of strategies.
-      This method is only applicable to games in a strategic form. When
-      this method is applied to a player in an extensive form it will raise
-      a type error.
-
-.. py:class:: Strategy
-
-   Represents a strategy available to a :py:class:`gambit.Player`.
-
-   .. py:attribute:: label
-
-      A text label useful for identification of the strategy.
-
-.. py:class:: Node
-
-   Represents a node in a :py:class:`gambit.Game`.
-
-   .. py:attribute:: label
-
-      A text label useful for identification of the node.
-
-.. py:class:: Outcome
-
-   Represents an outcome in a :py:class:`gambit.Game`.
-
-   .. py:method:: delete()
-
-      Deletes the outcome from the game.
-
-   .. py:attribute:: label
-
-      A text label useful for identification of the outcome.
-
-   .. py:method:: __getitem__(player)
-
-      Returns the payoff to ``player`` at the outcome.  ``player``
-      may be a :py:class:`gambit.Player`, a string, or an integer.
-      If a string, returns the payoff to the player with that string
-      as its label.  If an integer, returns the payoff to player
-      number ``player``.
-
-   .. py:method:: __setitem__(player, payoff)
-
-      Sets the payoff to the ``pl`` th player at the outcome to the
-      specified ``payoff``.  Payoffs may be specified as integers
-      or instances of ``decimal.Decimal`` or ``fractions.Fraction``.
-      Players may be specified as in ``__getitem__``.
-
-.. py:class:: Outcomes
-   
-   A collection object representing the outcomes of a game.
-
-   .. py:method:: len()
-
-      Returns the number of outcomes in the game.
-
-   .. py:method:: __getitem__(i)
-
-      Returns outcome ``i`` in the game.  Outcomes are numbered
-      starting with ``0``.
-
-   .. py:method:: add([label=""])
-
-      Add a :py:class:`gambit.Outcome` to the game.  If label
-      is specified, sets the text label for the outcome. If the 
-      provided outcome label is shared by another outcome a warning 
-      will be returned.
-      
-
-.. py:class:: MixedProfile
-
-   Represents a mixed strategy profile over a :py:class:`gambit.Game`.
+   Represents a mixed strategy profile over a :py:class:`Game`.
 
    .. py:method:: __getitem__(index)
 
       Returns a slice of the profile based on the parameter
-      ``index``.  If ``index`` is a :py:class:`gambit.Strategy`,
-      returns the probability with which that strategy is played in
-      the profile.  If ``index`` is a :py:class:`gambit.Player`,
-      returns a list of probabilities, one for each strategy belonging
-      to that player.  If ``index`` is an integer, returns the
-      ``index`` th entry in the profile, treating the profile as a
-      flat list of probabilities.
+      ``index``.  
+
+      * If ``index`` is a :py:class:`Strategy`, returns the
+        probability with which that strategy is played in the profile.
+      * If ``index`` is a :py:class:`Player`, returns a list of
+        probabilities, one for each strategy belonging to that player.
+      * If ``index`` is an integer, returns the ``index`` th entry in
+        the profile, treating the profile as a flat list of probabilities.
 
    .. py:method:: __setitem__(strategy, prob)
 
       Sets the probability ``strategy`` is played in the profile to ``prob``. 
 
-   .. py:method:: as_behav()
+   .. py:method:: as_behavior()
 
       Returns a behavior strategy profile :py:class:`BehavProfile` associated
       to the profile.
 
-      :raises: :py:class:`gambit.UndefinedOperationError` if the game does not have a tree representation.
+      :raises gambit.UndefinedOperationError: if the game does not
+                                              have a tree representation.
          
    .. py:method:: copy()
 
@@ -928,19 +711,18 @@ API documentation
 
    .. py:method:: payoff(player)
 
-      Returns the expected payoff to ``player`` if all players play
+      Returns the expected payoff to a player if all players play
       according to the profile.
 
    .. py:method:: strategy_value(strategy)
 
-      Returns the expected payoff to choosing ``strategy`` if all
+      Returns the expected payoff to choosing the strategy, if all
       other players play according to the profile.
 
    .. py:method:: strategy_values(player)
 
       Returns the expected payoffs for a player's set of strategies 
-      to choosing ``strategy`` if all other players play according to 
-      the profile.
+      if all other players play according to the profile.
 
    .. py:method:: liap_value()
 
@@ -948,30 +730,36 @@ API documentation
       Lyapunov value is a non-negative number which is zero exactly at
       Nash equilibria.
 
-.. py:class:: BehavProfile
+.. py:class:: MixedBehaviorProfile
 
-   Represents a behavior strategy profile over a :py:class:`gambit.Game`.
+   Represents a behavior strategy profile over a :py:class:`Game`.
 
    .. py:method:: __getitem__(index)
 
       Returns a slice of the profile based on the parameter
-      ``index``.  If ``index`` is a :py:class:`gambit.Action`,
-      returns the probability with which that action is played in
-      the profile. 
-      If ``index`` is an :py:class:`gambit.Infoset`,
-      returns a list of probabilities, one for each action belonging
-      to that information set.  If ``index`` is an integer, returns the
-      ``index`` th entry in the profile, treating the profile as a
-      flat list of probabilities.
+      ``index``.  
+
+      * If ``index`` is a :py:class:`Action`,
+        returns the probability with which that action is played in
+        the profile. 
+      * If ``index`` is an :py:class:`Infoset`,
+        returns a list of probabilities, one for each action belonging
+        to that information set.  
+      * If ``index`` is a :py:class:`Player`,
+        returns a list of lists of probabilities, one list for each
+        information set controlled by the player.
+      * If ``index`` is an integer, returns the
+        ``index`` th entry in the profile, treating the profile as a
+        flat list of probabilities.
 
    .. py:method:: __setitem__(action, prob)
 
       Sets the probability ``action`` is played in the profile to ``prob``. 
 
-   .. py:method:: as_mixed()
+   .. py:method:: as_strategy()
 
-      Returns a behavior strategy profile as a :py:class:`BehavProfile` 
-      object associated to the profile.
+      Returns a :py:class:`MixedStrategyProfile` which is equivalent
+      to the profile.
 
    .. py:method:: belief(node)
 
@@ -1018,14 +806,431 @@ API documentation
       Lyapunov value is a non-negative number which is zero exactly at
       Nash equilibria.
 
-.. py:class:: MismatchError
+Elements of games
+~~~~~~~~~~~~~~~~~
 
-   An ``Exception`` which is raised on an operation between objects from 
-   different games.
-   Subclasses from ``ValueError``.
+These classes represent elements which exist inside of the definition
+of game.
 
-.. py:class:: UndefinedOperationError
+.. py:class:: Rational
 
-   An ``Exception`` which is raised when an undefined operation is 
-   attempted.
-   Subclasses from ``ValueError``.
+   .. versionadded:: 15.0.0
+
+   Represents a rational number in specifying numerical data for a
+   game, or in a computed strategy profile.  This is implemented as a
+   subclass of the Python standard library
+   :py:class:`fractions.Fraction`, with additional instrumentation for
+   rendering in IPython notebooks.
+
+
+.. py:class:: Players
+   
+   A collection object representing the players in a game.
+
+   .. py:method:: len()
+
+      Returns the number of players in the game.
+
+   .. py:method:: __getitem__(i)
+
+      Returns player number ``i`` in the game.  Players are numbered
+      starting with ``0``.
+
+   .. py:attribute:: chance
+
+      Returns the player representing all chance moves in the game.
+
+   .. py:method:: add([label=""])
+
+      Add a :py:class:`Player` to the game.  If label
+      is specified, sets the text label for the player. In the case
+      of extensive games this will create a new player with no 
+      moves. In the case of strategic form games it creates a player
+      with one strategy. If the provided player label is shared by
+      another player a warning will be returned.
+
+.. py:class:: Player
+
+   Represents a player in a :py:class:`Game`.
+
+   .. py:attribute:: game
+
+      Returns the :py:class:`Game` in which the player is.
+
+   .. py:attribute:: label
+
+      A text label useful for identification of the player.
+
+   .. py:attribute:: number
+
+      Returns the number of the player in the :py:class:`Game`.
+      Players are numbered starting with ``0``.
+
+   .. py:attribute:: is_chance
+
+      Returns ``True`` if the player object represents the chance player.
+
+   .. py:attribute:: infosets
+
+      Returns a list-like object representing the information sets of the player.
+
+   .. py:attribute:: strategies
+
+      Returns a :py:class:`gambit.Strategies` collection object
+      representing the strategies of the player.
+
+   .. py:attribute:: min_payoff
+
+      Returns the smallest payoff for the player in any outcome of the game.
+
+   .. py:attribute:: max_payoff
+
+      Returns the largest payoff for the player in any outcome of the game.
+
+
+.. py:class:: Infoset
+
+   An information set for an extensive form game.
+
+   .. py:method:: precedes(node)
+
+      Returns ``True`` or ``False`` depending on whether the specified node
+      precedes the information set in the extensive game. 
+
+   .. py:method:: reveal(player)
+
+      Reveals the information set to a player.
+
+   .. py:attribute:: actions
+
+      Returns a :py:class:`gambit.Actions` collection object representing 
+      the actions defined in this information set.
+
+   .. py:attribute:: label
+
+      A text label used to identify the information set.
+
+   .. py:attribute:: is_chance
+
+      Returns ``True`` or ``False`` depending on whether this information set is
+      associated to the chance player.
+
+   .. py:attribute:: members
+
+      Returns the set of nodes associated with this information set.
+
+   .. py:attribute:: player
+
+      Returns the player object associated with this information set.
+
+
+.. py:class:: Actions
+   
+   A collection object representing the actions available at an
+   information set in a game.
+
+   .. py:method:: len()
+
+      Returns the number of actions for the player.
+
+   .. py:method:: __getitem__(i)
+
+      Returns action number ``i``.  Actions are numbered
+      starting with ``0``.
+
+   .. py:method:: add([action=None])
+
+      Add a :py:class:`Action` to the list of actions of an 
+      information set.
+
+
+.. py:class:: Action
+
+   An action associated with an information set.
+
+   .. py:method:: delete()
+
+      Deletes this action from the game.
+
+      :raises gambit.UndefinedOperationError: when the action is the
+                                              last one of its infoset.
+
+   .. py:method:: precedes(node)
+
+      Returns ``True`` if ``node`` precedes this action in the
+      extensive game.
+
+   .. py:attribute:: label
+
+      A text label used to identify the action.
+
+   .. py:attribute:: infoset
+
+      Returns the information to which this action is associated.
+
+   .. py:attribute:: prob
+
+      A settable property that represents the probability associated 
+      with the action. It can be a value stored as an int,
+      :py:class:`gambit.Rational`, or :py:class:`gambit.Decimal`.
+
+
+.. py:class:: Strategies
+   
+   A collection object representing the strategies available to a
+   player in a game.
+
+   .. py:method:: len()
+
+      Returns the number of strategies for the player.
+
+   .. py:method:: __getitem__(i)
+
+      Returns strategy number ``i``.  Strategies are numbered
+      starting with ``0``.
+
+   .. py:method:: add([label=""])
+
+      Add a :py:class:`Strategy` to the player's list of strategies.
+
+      :raises TypeError: if called on a game which has an extensive representation.
+
+
+.. py:class:: Strategy
+
+   Represents a strategy available to a :py:class:`Player`.
+
+   .. py:attribute:: label
+
+      A text label useful for identification of the strategy.
+
+
+
+.. py:class:: Node
+
+   Represents a node in a :py:class:`Game`.
+
+   .. py:method:: is_successor_of(node)
+
+      Returns ``True`` if the node is a successor of ``node``.
+
+   .. py:method:: is_subgame_root(node)
+
+      Returns ``True`` if the current node is a root of a proper subgame.
+
+   .. py:attribute:: label
+
+      A text label useful for identification of the node.
+
+   .. py:attribute:: is_terminal
+
+      Returns ``True`` if the node is a terminal node in the game tree.
+
+   .. py:attribute:: children
+
+      Returns a collection of the node's children.
+
+   .. py:attribute:: game
+
+      Returns the :py:class:`Game` to which the node belongs.
+
+   .. py:attribute:: infoset
+
+      Returns the :py:class:`Infoset` associated with the node.
+
+   .. py:attribute:: player
+
+      Returns the :py:class:`Player` associated with the node.
+
+   .. py:attribute:: parent
+
+      Returns the :py:class:`Node` that is the parent of this node.
+
+   .. py:attribute:: prior_action
+
+      Returns the action immediately prior to the node.
+
+   .. py:attribute:: prior_sibling
+
+      Returns the :py:class:`Node` that is prior to the 
+      node at the same level of the game tree.
+
+   .. py:attribute:: next_sibling
+
+      Returns the :py:class:`Node` that is the next node at the same
+      level of the game tree.
+
+   .. py:attribute:: outcome
+
+      Returns the :py:class:`Outcome` that is associated 
+      with the node.
+
+   .. py:method:: append_move(infoset[ , actions])
+
+      Add a move to a terminal node, at the :py:class:`gambit.Infoset`
+      ``infoset``.  Alternatively, a :py:class:`gambit.Player` can be
+      passed as the information set, in which case the move is placed
+      in a new information set for that player; in this instance, the
+      number of ``actions`` at the new information set must be specified.
+
+      :raises gambit.UndefinedOperationError: when called on a non-terminal node.
+      :raises gambit.UndefinedOperationError: when called with a :py:class:`Player` object and no actions, or actions < 1.
+      :raises gambit.UndefinedOperationError: when called with a :py:class:`Infoset` object and with actions.
+      :raises gambit.MismatchError: when called with objects from different games.
+
+   .. py:method:: insert_move(infoset[ , actions])
+
+      Insert a move at a node, at the :py:class:`Infoset`
+      ``infoset``.  Alternatively, a :py:class:`Player` can be
+      passed as the information set, in which case the move is placed
+      in a new information set for that player; in this instance, the
+      number of ``actions`` at the new information set must be specified.
+      The newly-inserted node takes the place of the node in the game
+      tree, and the existing node becomes the first child of the new node.
+
+      :raises gambit.UndefinedOperationError: when called with a :py:class:`Player` object and no actions, or actions < 1.
+      :raises gambit.UndefinedOperationError: when called with a :py:class:`Infoset` object and with actions.
+      :raises gambit.MismatchError: when called with objects from different games.
+
+   .. py:method:: leave_infoset()
+
+      Removes this node from its information set. If this node is the last
+      of its information set, this method does nothing.
+
+   .. py:method:: delete_parent()
+
+      Deletes the parent node and its subtrees other than the one 
+      which contains this node and moves this node into its former 
+      parent's place.
+
+   .. py:method:: delete_tree()
+
+      Deletes the whole subtree which has this node as a root, except 
+      the actual node.
+
+   .. py:method:: copy_tree(node)
+
+      Copies the subtree rooted at this node to ``node``.
+
+      :raises gambit.MismatchError: if both objects aren't in the same game.
+
+   .. py:method:: move_tree(node)
+
+      Move the subtree rooted at this node to ``node``.
+
+      :raises gambit.MismatchError: if both objects aren't in the same game.
+
+
+.. py:class:: Outcomes
+   
+   A collection object representing the outcomes of a game.
+
+   .. py:method:: len()
+
+      Returns the number of outcomes in the game.
+
+   .. py:method:: __getitem__(i)
+
+      Returns outcome ``i`` in the game.  Outcomes are numbered
+      starting with ``0``.
+
+   .. py:method:: add([label=""])
+
+      Add a :py:class:`Outcome` to the game.  If label
+      is specified, sets the text label for the outcome. If the 
+      provided outcome label is shared by another outcome a warning 
+      will be returned.
+
+
+.. py:class:: Outcome
+
+   Represents an outcome in a :py:class:`Game`.
+
+   .. py:method:: delete()
+
+      Deletes the outcome from the game.
+
+   .. py:attribute:: label
+
+      A text label useful for identification of the outcome.
+
+   .. py:method:: __getitem__(player)
+
+      Returns the payoff to ``player`` at the outcome.  ``player``
+      may be a :py:class:`Player`, a string, or an integer.
+      If a string, returns the payoff to the player with that string
+      as its label.  If an integer, returns the payoff to player
+      number ``player``.
+
+   .. py:method:: __setitem__(player, payoff)
+
+      Sets the payoff to the ``pl`` th player at the outcome to the
+      specified ``payoff``.  Payoffs may be specified as integers
+      or instances of :py:class:`gambit.Decimal` or :py:class:`gambit.Rational`.
+      Players may be specified as in :py:func:`__getitem__`.
+
+
+Representation of errors and exceptions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:exception:: MismatchError
+
+   A subclass of :py:exc:`ValueError` which is raised when
+   attempting an operation among objects from different games.
+
+.. py:exception:: UndefinedOperationError
+
+   A subclass of :py:exc:`ValueError` which is raised when an
+   operation which is not well-defined is attempted.
+
+
+Computation of Nash equilibria
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:module:: gambit.nash
+
+.. py:function:: enumpure_solve(game, use_strategic=True, external=False)
+
+   Compute :ref:`pure-strategy Nash equilibria <gambit-enumpure>` of a
+   game.
+
+   :param bool use_strategic: Use the strategic form.  If
+			      :literal:`False`, computes agent-form
+     		              pure-strategy equilibria, which treat
+			      only unilateral deviations at an
+			      individual information set
+   :param bool external: Call the external command-line solver instead
+			 of the internally-linked implementation
+
+
+.. py:function:: lcp_solve(game, rational=True, use_strategic=False, external=False, stop_after=None, max_depth=None)
+
+   Compute Nash equilibria of a two-player game using :ref:`linear
+   complementarity programming <gambit-lcp>`.
+
+   :param bool rational: Compute using rational precision (more
+			 precise, often much slower)
+   :param bool use_strategic: Use the strategic form version even for
+			      extensive games
+   :param bool external: Call the external command-line solver instead
+			 of the internally-linked implementation
+   :param int stop_after: Number of equilibria to contribute (default
+			  is to compute until all reachable equilbria
+			  are found)
+   :param int max_depth: Maximum recursion depth (default is no limit)
+   :raises RuntimeError: if game has more than two players.
+
+
+.. py:function:: lp_solve(game, rational=True, use_strategic=False, external=False)
+
+   Compute Nash equilibria of a two-player constant-sum game using :ref:`linear
+   programming <gambit-lp>`.
+
+   :param bool rational: Compute using rational precision (more
+			 precise, often much slower)
+   :param bool use_strategic: Use the strategic form version even for
+			      extensive games
+   :param bool external: Call the external command-line solver instead
+			 of the internally-linked implementation
+   :raises RuntimeError: if game has more than two players.
+

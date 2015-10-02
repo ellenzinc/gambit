@@ -1,6 +1,6 @@
 dnl
 dnl This file is part of Gambit
-dnl Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+dnl Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 dnl
 dnl FILE: configure.in
 dnl autoconf configuration script for Gambit
@@ -20,8 +20,9 @@ dnl along with this program; if not, write to the Free Software
 dnl Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 dnl
 
-AC_INIT([gambit], [14.0.0])
+AC_INIT([gambit], [15.0.0])
 AC_CONFIG_SRCDIR([src/libgambit/libgambit.h])
+AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_MACRO_DIR([m4])
 AM_OPTIONS_WXCONFIG
@@ -93,7 +94,7 @@ if test x$with_gui = xtrue; then
   dnl------------------------
 
   dnl check for wx-config
-  AM_PATH_WXCONFIG(2.8.0, WXCONFIG=1)
+  AM_PATH_WXCONFIG(2.8.12, WXCONFIG=1)
   if test "$WXCONFIG" != 1; then
       AC_MSG_WARN([
             Did not find a new enough version of wxWidgets; disabling build of
@@ -101,7 +102,7 @@ if test x$with_gui = xtrue; then
             please check that wx-config is in path, the directory
             where wxWidgets libraries are installed (returned by
             'wx-config --libs' command) is in LD_LIBRARY_PATH or
-            equivalent variable and wxWidgets is version 2.8.0 or above.
+            equivalent variable and wxWidgets is version 2.8.12 or above.
       ])
       GUI_PROGS=""
       AM_CONDITIONAL(WITH_GUI, test x0 = x1)

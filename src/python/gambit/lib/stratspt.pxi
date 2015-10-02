@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/stratspt.pxi
 # Cython wrapper for strategy supports
@@ -28,20 +28,20 @@ cdef class StrategySupportProfile(Collection):
     A set-like object representing a subset of the strategies in game, incorporating
     the restriction that each player must have at least one strategy in the set.
     """
-    cdef c_StrategySupport *support
+    cdef c_StrategySupportProfile *support
 
     def __init__(self, strategies, Game game not None):
-       self.support = (<c_StrategySupport *>0)  
+       self.support = (<c_StrategySupportProfile *>0)  
        if self.is_valid(strategies, len(game.players)):
-            temp_restriction = <StrategicRestriction>game.mixed_profile().restriction()
-            self.support = new c_StrategySupport(deref(temp_restriction.support))
+            temp_restriction = <StrategicRestriction>game.mixed_strategy_profile().restriction()
+            self.support = new c_StrategySupportProfile(deref(temp_restriction.support))
             for strategy in game.strategies:
                 if strategy not in strategies:
                     self.support.RemoveStrategy((<Strategy>strategy).strategy)
        else:
             raise ValueError("invalid set of strategies")
     def __dealloc__(self):
-        if self.support != (<c_StrategySupport *>0):
+        if self.support != (<c_StrategySupportProfile *>0):
             del self.support
     def __len__(self):    return self.support.MixedProfileLength()
     def __richcmp__(StrategySupportProfile self, other, whichop):
@@ -123,13 +123,13 @@ cdef class StrategySupportProfile(Collection):
     def restrict(self):
         cdef StrategicRestriction restriction
         restriction = StrategicRestriction()
-        restriction.support = new c_StrategySupport(deref(self.support))
+        restriction.support = new c_StrategySupportProfile(deref(self.support))
         return restriction
 
     def undominated(self, strict=False, external=False):
         cdef StrategicRestriction restriction
         restriction = StrategicRestriction()
-        restriction.support = new c_StrategySupport(self.support.Undominated(strict, external))
+        restriction.support = new c_StrategySupportProfile(self.support.Undominated(strict, external))
         new_profile = StrategySupportProfile(restriction.strategies, self.game)
         return new_profile 
 
@@ -193,15 +193,15 @@ cdef class StrategicRestriction(BaseGame):
     A StrategicRestriction is a read-only view on a game, defined by a
     subset of the strategies on the original game.
     """
-    cdef c_StrategySupport *support
+    cdef c_StrategySupportProfile *support
 
     def __init__(self):
-        self.support = (<c_StrategySupport *>0)
+        self.support = (<c_StrategySupportProfile *>0)
     def __dealloc__(self):
-        if self.support != (<c_StrategySupport *>0):
+        if self.support != (<c_StrategySupportProfile *>0):
             del self.support
     def __repr__(self):
-        return "<StrategicRestriction of Game '%s'>" % self.title
+        return self.write()
 
     def __richcmp__(StrategicRestriction self, other, whichop):
         if isinstance(other, StrategicRestriction):
@@ -246,6 +246,12 @@ cdef class StrategicRestriction(BaseGame):
             o = RestrictionOutcomes(self)
             return o
 
+    property is_tree:
+        def __get__(self):
+            # Any strategic restriction is automatically not a tree
+            # representation, even if the parent game does have one.
+            return False
+
     property is_const_sum:
         def __get__(self):
             return self.unrestrict().is_const_sum
@@ -262,10 +268,16 @@ cdef class StrategicRestriction(BaseGame):
         def __get__(self):
             return self.unrestrict().max_payoff
 
+    def write(self, format='native'):
+        if format != 'native' and format != 'nfg':
+            raise NotImplementedError
+        else:
+            return WriteGame(deref(self.support)).c_str()
+
     def undominated(self, strict=False):
         cdef StrategicRestriction new_restriction
         new_restriction = StrategicRestriction()
-        new_restriction.support = new c_StrategySupport(self.support.Undominated(strict, False))
+        new_restriction.support = new c_StrategySupportProfile(self.support.Undominated(strict, False))
         return new_restriction
 
     def num_strategies_player(self, pl):
@@ -329,7 +341,7 @@ cdef class StrategicRestriction(BaseGame):
                 raise TypeError("Must use a tuple of ints, strategy labels, or strategies")
         return self._get_contingency(*tuple(cont))
 
-    def mixed_profile(self, rational=False):
+    def mixed_strategy_profile(self, rational=False):
         cdef MixedStrategyProfileDouble mspd
         cdef MixedStrategyProfileRational mspr
         cdef c_Rational dummy_rat

@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/behav.cc
 // Instantiation of behavior profile classes.
@@ -23,8 +23,8 @@
 #include "libgambit.h"
 #include "behav.imp"
 
-template class Gambit::MixedBehavProfile<double>;
-template class Gambit::MixedBehavProfile<Gambit::Rational>;
+template class Gambit::MixedBehaviorProfile<double>;
+template class Gambit::MixedBehaviorProfile<Gambit::Rational>;
 
 
 

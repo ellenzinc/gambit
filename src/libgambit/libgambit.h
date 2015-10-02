@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/libgambit.h
 // Top-level include file for libgambit
@@ -27,6 +27,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <config.h>
 
 namespace Gambit {
 
@@ -51,7 +52,7 @@ template <class D, class S> D lexical_cast(const S &p_value, int p_prec)
 class Exception : public std::runtime_error {
 public:
   Exception(void) : std::runtime_error("") { }
-  Exception(const char *s) : std::runtime_error(s) { }
+  Exception(const std::string &s) : std::runtime_error(s) { }
   virtual ~Exception() throw() { }
 };
 
@@ -106,6 +107,7 @@ public:
 
 } // end namespace Gambit
 
+#include "shared_ptr.h"
 #include "array.h"
 #include "list.h"
 #include "recarray.h"

@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/nhas.py
 # A set of utilities for computing Nash equilibria
@@ -63,9 +63,9 @@ class ExternalSolver(object):
             entries = line.strip().split(",")
             if entries[0] != "NE":  continue
             if extensive:
-                profile = game.behav_profile(rational=rational)
+                profile = game.mixed_behavior_profile(rational=rational)
             else:
-                profile = game.mixed_profile(rational=rational)
+                profile = game.mixed_strategy_profile(rational=rational)
             for (i, p) in enumerate(entries[1:]):
                 if rational:
                     profile[i] = Fraction(p)
@@ -80,6 +80,8 @@ class ExternalEnumPureSolver(ExternalSolver):
     for computing pure-strategy equilibria.
     """
     def solve(self, game, use_strategic=False):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-enumpure"
         if use_strategic and game.is_tree:
             command_line += " -S"
@@ -93,6 +95,12 @@ class ExternalLPSolver(ExternalSolver):
     for computing equilibria in two-player games using linear programming.
     """
     def solve(self, game, rational=False, use_strategic=False):
+        if len(game.players) != 2:
+            raise RuntimeError("Method only valid for two-player games.")
+        if not game.is_const_sum:
+            raise RuntimeError("Method only valid for constant-sum games.")
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         if rational:
             command_line = "gambit-lp"
         else:
@@ -110,6 +118,10 @@ class ExternalLCPSolver(ExternalSolver):
     programming.
     """
     def solve(self, game, rational=False, use_strategic=False):
+        if len(game.players) != 2:
+            raise RuntimeError("Method only valid for two-player games.")
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         if rational:
             command_line = "gambit-lcp"
         else:
@@ -126,6 +138,8 @@ class ExternalEnumMixedSolver(ExternalSolver):
     for computing equilibria in two-player games using enumeration of extreme points.
     """
     def solve(self, game, rational=False):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         if rational:
             command_line = "gambit-enummixed"
         else:
@@ -139,6 +153,8 @@ class ExternalSimpdivSolver(ExternalSolver):
     for computing equilibria in N-player games using simpicial subdivision.
     """
     def solve(self, game):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-simpdiv"
         return self._parse_output(self.launch(command_line, game),
                                   game, rational=True)
@@ -149,6 +165,8 @@ class ExternalGlobalNewtonSolver(ExternalSolver):
     for computing equilibria in N-player games using the global Newton method.
     """
     def solve(self, game):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-gnm -d 10"
         return self._parse_output(self.launch(command_line, game),
                                   game, rational=False)
@@ -159,6 +177,8 @@ class ExternalEnumPolySolver(ExternalSolver):
     for computing equilibria in N-player games systems of polynomial equations.
     """
     def solve(self, game, use_strategic=False):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-enumpoly -d 10"
         if use_strategic and game.is_tree:
             command_line += " -S"
@@ -172,6 +192,8 @@ class ExternalLyapunovSolver(ExternalSolver):
     for computing equilibria in N-player games using Lyapunov function minimization.
     """
     def solve(self, game, use_strategic=False):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-liap -d 10"
         if use_strategic and game.is_tree:
             command_line += " -S"
@@ -185,6 +207,8 @@ class ExternalIteratedPolymatrixSolver(ExternalSolver):
     for computing equilibria in N-player games using iterated polymatrix approximation.
     """
     def solve(self, game):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         command_line = "gambit-ipa -d 10"
         return self._parse_output(self.launch(command_line, game),
                                   game, rational=False)
@@ -195,6 +219,8 @@ class ExternalLogitSolver(ExternalSolver):
     for computing equilibria in N-player games using quantal response equilibrium.
     """
     def solve(self, game, use_strategic=False):
+        if not game.is_perfect_recall:
+            raise RuntimeError("Computing equilibria of games with imperfect recall is not supported.")
         profiles = [ ]
         command_line = "gambit-logit -d 20 -e"
         if use_strategic and game.is_tree:
@@ -202,3 +228,63 @@ class ExternalLogitSolver(ExternalSolver):
         return self._parse_output(self.launch(command_line, game),
                                   game, rational=False,
                                   extensive=game.is_tree and not use_strategic)
+
+
+import gambit.lib.libgambit
+
+def enumpure_solve(game, use_strategic=True, external=False):
+    """Convenience function to solve game to find pure-strategy Nash equilibria.
+    """
+    if external:
+        return ExternalEnumPureSolve().solve(game, use_strategic=True)
+    if not game.is_tree or use_strategic:
+        alg = gambit.lib.libgambit.EnumPureStrategySolver()
+    else:
+        alg = gambit.lib.libgambit.EnumPureAgentSolver()
+    return alg.solve(game)
+
+def lcp_solve(game, rational=True, use_strategic=False, external=False,
+              stop_after=None, max_depth=None):
+    """Convenience function to solve game using an appropriate linear
+    complementarity solver.
+    """
+    if stop_after is None: stop_after = 0
+    if max_depth is None:  max_depth = 0
+    if external:
+        return ExternalLCPSolver().solve(game, rational=rational,
+                                         use_strategic=use_strategic)
+    if not game.is_tree or use_strategic:
+        if rational:
+            alg = gambit.lib.libgambit.LCPStrategySolverRational(stop_after, max_depth)
+        else:
+            alg = gambit.lib.libgambit.LCPStrategySolverDouble(stop_after, max_depth)
+    else:        
+        if rational:
+            alg = gambit.lib.libgambit.LCPBehaviorSolverRational(stop_after, max_depth)
+        else:
+            alg = gambit.lib.libgambit.LCPBehaviorSolverDouble(stop_after, max_depth)
+    return alg.solve(game)
+
+def lp_solve(game, rational=True, use_strategic=False, external=False):
+    """Convenience function to solve game using an appropriate linear
+    programming solver.
+    """
+    if external:
+        return ExternalLPSolver().solve(game, rational=rational,
+                                         use_strategic=use_strategic)
+    if not game.is_tree or use_strategic:
+        if rational:
+            alg = gambit.lib.libgambit.LPStrategySolverRational()
+        else:
+            alg = gambit.lib.libgambit.LPStrategySolverDouble()
+    else:        
+        if rational:
+            alg = gambit.lib.libgambit.LPBehaviorSolverRational()
+        else:
+            alg = gambit.lib.libgambit.LPBehaviorSolverDouble()
+    return alg.solve(game)
+
+logit_estimate = gambit.lib.libgambit.logit_estimate
+logit_atlambda = gambit.lib.libgambit.logit_atlambda
+logit_principal_branch = gambit.lib.libgambit.logit_principal_branch
+

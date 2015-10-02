@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/logit/logit.cc
 // Command-line driver program for quantal response equilibrium tracing and
@@ -31,12 +31,14 @@
 #include "efglogit.h"
 #include "nfglogit.h"
 
+using namespace Gambit;
+
 
 void PrintBanner(std::ostream &p_stream)
 {
   p_stream << "Compute a branch of the logit equilibrium correspondence\n";
   p_stream << "Gambit version " VERSION ", ";
-  p_stream << "Copyright (C) 1994-2013, The Gambit Project\n";
+  p_stream << "Copyright (C) 1994-2014, The Gambit Project\n";
   p_stream << "This is free software, distributed under the GNU GPL\n\n";
 }
 
@@ -65,7 +67,7 @@ void PrintHelp(char *progname)
 //
 // Read in a comma-separated values list of observed data values
 //
-bool ReadProfile(std::istream &p_stream, Gambit::Array<double> &p_profile)
+bool ReadProfile(std::istream &p_stream, Vector<double> &p_profile)
 {
   for (int i = 1; i <= p_profile.Length(); i++) {
     if (p_stream.eof() || p_stream.bad()) {
@@ -91,7 +93,7 @@ int main(int argc, char *argv[])
 
   bool quiet = false, useStrategic = false;
   double maxLambda = 1000000.0;
-  std::string mleFile = "", startFile = "";
+  std::string mleFile = "";
   double maxDecel = 1.1;
   double hStart = 0.03;
   double targetLambda = -1.0;
@@ -136,9 +138,6 @@ int main(int argc, char *argv[])
     case 'L':
       mleFile = optarg;
       break;
-    case 'p':
-      startFile = optarg;
-      break;
     case 'l':
       targetLambda = atof(optarg);
       break;
@@ -173,72 +172,53 @@ int main(int argc, char *argv[])
   }
 
   try {
-    Gambit::Array<double> frequencies;
-    Gambit::Game game = Gambit::ReadGame(*input_stream);
+    Game game = ReadGame(*input_stream);
+    if (!game->IsPerfectRecall()) {
+      throw UndefinedException("Computing equilibria of games with imperfect recall is not supported.");
+    }
 
     if (mleFile != "" && (!game->IsTree() || useStrategic)) {
-      frequencies = Gambit::Array<double>(game->MixedProfileLength());
+      MixedStrategyProfile<double> frequencies(game->NewMixedStrategyProfile(0.0));
       std::ifstream mleData(mleFile.c_str());
       ReadProfile(mleData, frequencies);
-    }
-  
 
-    if (!game->IsTree() || useStrategic) {
-      if (startFile == "") {
-	Gambit::MixedStrategyProfile<double> start(game->NewMixedStrategyProfile(0.0));
-	StrategicQREPathTracer tracer(start);
-	tracer.SetMaxDecel(maxDecel);
-	tracer.SetStepsize(hStart);
-	tracer.SetFullGraph(fullGraph);
-	tracer.SetTargetParam(targetLambda);
-	tracer.SetDecimals(decimals);
-	tracer.SetMLEFrequencies(frequencies);
-	tracer.TraceStrategicPath(start, 0.0, maxLambda, 1.0);
-      }
-      else {
-	Gambit::Array<double> profile(game->MixedProfileLength() + 1);
-	std::ifstream startData(startFile.c_str());
-	ReadProfile(startData, profile);
-	Gambit::MixedStrategyProfile<double> start(game->NewMixedStrategyProfile(0.0));
-	for (int i = 1; i <= start.MixedProfileLength(); i++) {
-	  start[i] = profile[i+1];
-	}
-	StrategicQREPathTracer tracer1(start);
-	tracer1.SetMaxDecel(maxDecel);
-	tracer1.SetStepsize(hStart);
-	tracer1.SetFullGraph(fullGraph);
-	tracer1.SetTargetParam(targetLambda);
-	tracer1.SetDecimals(decimals);
-	tracer1.TraceStrategicPath(start, profile[1], maxLambda, 1.0);
-	std::cout << std::endl;
-	StrategicQREPathTracer tracer2(start);
-	tracer2.SetMaxDecel(maxDecel);
-	tracer2.SetStepsize(hStart);
-	tracer2.SetFullGraph(fullGraph);
-	tracer2.SetTargetParam(targetLambda);
-	tracer2.SetDecimals(decimals);
-	tracer2.TraceStrategicPath(start, profile[1], maxLambda, -1.0);
-      }
-
-    }
-    else {
-      MixedBehavProfile<double> start(game);
-      AgentQREPathTracer tracer(start);
+      LogitQREMixedStrategyProfile start(game);
+      StrategicQREEstimator tracer;
       tracer.SetMaxDecel(maxDecel);
       tracer.SetStepsize(hStart);
       tracer.SetFullGraph(fullGraph);
-      tracer.SetTargetParam(targetLambda);
       tracer.SetDecimals(decimals);
-      tracer.TraceAgentPath(start, 0.0, maxLambda, 1.0);
+      tracer.Estimate(start, frequencies, std::cout, maxLambda, 1.0);
+      return 0;
+    }
+
+    if (!game->IsTree() || useStrategic) {
+      LogitQREMixedStrategyProfile start(game);
+      StrategicQREPathTracer tracer;
+      tracer.SetMaxDecel(maxDecel);
+      tracer.SetStepsize(hStart);
+      tracer.SetFullGraph(fullGraph);
+      tracer.SetDecimals(decimals);
+      if (targetLambda > 0.0) {
+	tracer.SolveAtLambda(start, std::cout, targetLambda, 1.0);
+      }
+      else {
+	tracer.TraceStrategicPath(start, std::cout, maxLambda, 1.0);
+      }
+    }
+    else {
+      LogitQREMixedBehaviorProfile start(game);
+      AgentQREPathTracer tracer;
+      tracer.SetMaxDecel(maxDecel);
+      tracer.SetStepsize(hStart);
+      tracer.SetFullGraph(fullGraph);
+      tracer.SetDecimals(decimals);
+      tracer.TraceAgentPath(start, std::cout, maxLambda, 1.0, targetLambda);
     }
     return 0;
   }
-  catch (Gambit::InvalidFileException) {
-    std::cerr << "Error: Game not in a recognized format.\n";
-    return 1;
-  }
-  catch (...) {
-    std::cerr << "Error: An internal error occurred.\n";
+  catch (std::runtime_error &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }

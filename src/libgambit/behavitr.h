@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/behavitr.h
 // Interface to extensive form action iterators
@@ -36,12 +36,12 @@ namespace Gambit {
 //       Iterating across all contingencies can be achieved by freezing
 //       player number 0 (this is the default state on initialization)
 //
-class BehavIterator {
+class BehaviorProfileIterator {
 private:
   bool m_atEnd;
-  BehavSupport m_support;
+  BehaviorSupportProfile m_support;
   PVector<int> m_currentBehav;
-  PureBehavProfile m_profile;
+  PureBehaviorProfile m_profile;
   int m_frozenPlayer, m_frozenInfoset;
   Array<Array<bool> > m_isActive;
   Array<int> m_numActiveInfosets;
@@ -53,9 +53,9 @@ public:
   /// @name Lifecycle
   //@{
   /// Construct a new iterator on the support, with no actions held fixed
-  BehavIterator(const BehavSupport &);
+  BehaviorProfileIterator(const BehaviorSupportProfile &);
   /// Construct a new iterator on the support, holding the action fixed
-  BehavIterator(const BehavSupport &, const GameAction &);
+  BehaviorProfileIterator(const BehaviorSupportProfile &, const GameAction &);
   //@}
   
   /// @name Iteration and data access
@@ -67,9 +67,9 @@ public:
   /// Has iterator gone past the end?
   bool AtEnd(void) const { return m_atEnd; }
   /// Get the current behavior profile
-  const PureBehavProfile &operator*(void) const { return m_profile; }
+  const PureBehaviorProfile &operator*(void) const { return m_profile; }
   /// Get the current behavior profile
-  const PureBehavProfile *const operator->(void) const { return &m_profile; }
+  const PureBehaviorProfile *const operator->(void) const { return &m_profile; }
   //@}
 };
 

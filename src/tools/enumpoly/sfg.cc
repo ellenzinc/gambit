@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/sfg.cc
 // Implementation of sequence form classes
@@ -30,7 +30,7 @@
 //----------------------------------------------------
 
 
-Sfg::Sfg(const Gambit::BehavSupport &S)
+Sfg::Sfg(const Gambit::BehaviorSupportProfile &S)
   : EF(S.GetGame()), efsupp(S), seq(EF->NumPlayers()), isetFlag(S.GetGame()->NumInfosets()),
     isetRow(S.GetGame()->NumInfosets()), infosets(EF->NumPlayers())
 { 
@@ -38,7 +38,7 @@ Sfg::Sfg(const Gambit::BehavSupport &S)
   Gambit::Array<Gambit::GameInfoset> zero(EF->NumPlayers());
   Gambit::Array<int> one(EF->NumPlayers());
 
-  Gambit::BehavSupport support(EF);
+  Gambit::BehaviorSupportProfile support(EF);
 
   for(i=1;i<=EF->NumPlayers();i++) {
     seq[i]=1;
@@ -231,9 +231,9 @@ Gambit::GameAction Sfg::GetAction(int pl, int j) const
   return (*sequences)[pl]->Find(j)->GetAction();
 }
 
-Gambit::MixedBehavProfile<double> Sfg::ToBehav(const Gambit::PVector<double> &x) const
+Gambit::MixedBehaviorProfile<double> Sfg::ToBehav(const Gambit::PVector<double> &x) const
 {
-  Gambit::MixedBehavProfile<double> b(efsupp);
+  Gambit::MixedBehaviorProfile<double> b(efsupp);
 
   b = (Gambit::Rational) 0;
 

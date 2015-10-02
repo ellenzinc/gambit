@@ -3,10 +3,10 @@ import fractions
 
 class TestGambitMixedBehavGame(object):
     def setUp(self):
-        self.game = gambit.read_game("test_games/mixed_behavior_game.efg")
+        self.game = gambit.Game.read_game("test_games/mixed_behavior_game.efg")
         
-        self.profile_double = self.game.behav_profile()
-        self.profile_rational = self.game.behav_profile(True)
+        self.profile_double = self.game.mixed_behavior_profile()
+        self.profile_rational = self.game.mixed_behavior_profile(True)
         
     def tearDown(self):
         del self.game
@@ -361,10 +361,10 @@ class TestGambitMixedBehavGame(object):
         assert self.profile_double.liap_value() == 0.0625
         assert self.profile_rational.liap_value() == fractions.Fraction("1/16")
 
-    def test_as_mixed(self):
+    def test_as_strategy(self):
         "Test converting the profile to a mixed strategy one"
-        mixed_double = self.profile_double.as_mixed()
-        mixed_rational = self.profile_rational.as_mixed()
+        mixed_double = self.profile_double.as_strategy()
+        mixed_rational = self.profile_rational.as_strategy()
 
         assert mixed_double[0] == self.profile_double[0]
         assert mixed_double[1] == self.profile_double[1]

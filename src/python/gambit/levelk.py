@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/levelk.py
 # Provides support for level-k/cognitive hierarchy modeling
@@ -37,7 +37,7 @@ def logit_br(game, profile, lam):
     maxi = values.index(max(values))
     logp0 = scipy.optimize.newton(lambda x: do_sum(maxi, x, lam, values),
                                   0.0)
-    br = game.mixed_profile()
+    br = game.mixed_strategy_profile()
     for i in xrange(len(profile)):
         br[i] = math.exp(logp0 + lam*(values[i]-values[maxi]))
     return br
@@ -64,7 +64,7 @@ def compute_coghier(game, tau, lam):
     a Poisson distribution of types with mean 'tau', with precision of
     best responses 'lam'.
     """
-    p = game.mixed_profile()
+    p = game.mixed_strategy_profile()
     if tau <= 0.0 or lam <= 0.0:
         return CognitiveHierarchyProfile(tau, lam, p)
     accum = float(scipy.stats.poisson(tau).pmf(0))

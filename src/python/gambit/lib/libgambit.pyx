@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/libgambit.pyx
 # Cython wrapper for Gambit C++ library
@@ -25,8 +25,20 @@ import fractions
 import warnings
 from libcpp cimport bool
 
-cdef extern from "libgambit/libgambit.h":
+class Decimal(decimal.Decimal):
     pass
+
+class Rational(fractions.Fraction):
+    def _repr_latex_(self):
+        if self.denominator != 1:
+            return r'$\frac{%s}{%s}$' % (self.numerator, self.denominator)
+        else:
+            return r'$%s$' % self.numerator
+
+cdef extern from "libgambit/libgambit.h":
+    cdef char *VERSION
+
+__version__ = VERSION
 
 cdef extern from "string":
     cdef cppclass cxx_string "string":
@@ -45,10 +57,16 @@ cdef extern from "libgambit/number.h":
      
 cdef extern from "libgambit/array.h":
     cdef cppclass Array[T]: 
-        int getitem "operator[]"(int) except +
+        T getitem "operator[]"(int) except +
         int Length()
         Array()
         Array(int)
+
+cdef extern from "libgambit/list.h":
+    cdef cppclass c_List "List"[T]:
+        T &getitem "operator[]"(int) except +
+        int Length()
+        void push_back(T)
 
 cdef extern from "libgambit/game.h":
     cdef cppclass c_GameRep "GameRep"
@@ -85,9 +103,12 @@ cdef extern from "libgambit/game.h":
     cdef cppclass c_GameStrategy "GameObjectPtr<GameStrategyRep>":
         c_GameStrategyRep *deref "operator->"() except +RuntimeError
 
-    cdef cppclass c_PureStrategyProfile "std::auto_ptr<PureStrategyProfileRep>":
+    cdef cppclass c_PureStrategyProfile "PureStrategyProfile":
         c_PureStrategyProfileRep *deref "operator->"()
         c_PureStrategyProfile(c_PureStrategyProfile)
+
+    cdef cppclass c_PureBehaviorProfile "PureBehaviorProfile":
+        c_PureBehaviorProfile(c_Game)
 
     cdef cppclass c_GameStrategyRep "GameStrategyRep":
         int GetNumber()
@@ -242,8 +263,11 @@ cdef extern from "libgambit/mixed.h":
     cdef cppclass c_MixedStrategyProfileDouble "MixedStrategyProfile<double>":
         c_Game GetGame()
         int MixedProfileLength()
-        c_StrategySupport GetSupport()
+        c_StrategySupportProfile GetSupport()
+        void SetCentroid()
+        void Normalize()
         double getitem "operator[]"(int) except +IndexError
+        double getitem_strategy "operator[]"(c_GameStrategy) except +IndexError
         double GetPayoff(c_GamePlayer)
         double GetPayoff(c_GameStrategy)
         double GetPayoffDeriv(int, c_GameStrategy, c_GameStrategy)
@@ -254,8 +278,11 @@ cdef extern from "libgambit/mixed.h":
     cdef cppclass c_MixedStrategyProfileRational "MixedStrategyProfile<Rational>":
         c_Game GetGame()
         int MixedProfileLength()
-        c_StrategySupport GetSupport()
+        c_StrategySupportProfile GetSupport()
+        void SetCentroid()
+        void Normalize()
         c_Rational getitem "operator[]"(int) except +IndexError
+        c_Rational getitem_strategy "operator[]"(c_GameStrategy) except +IndexError
         c_Rational GetPayoff(c_GamePlayer)
         c_Rational GetPayoff(c_GameStrategy)
         c_Rational GetPayoffDeriv(int, c_GameStrategy, c_GameStrategy)
@@ -264,10 +291,12 @@ cdef extern from "libgambit/mixed.h":
         c_MixedStrategyProfileRational(c_MixedStrategyProfileRational)
 
 cdef extern from "libgambit/behav.h":
-    cdef cppclass c_MixedBehavProfileDouble "MixedBehavProfile<double>":
+    cdef cppclass c_MixedBehaviorProfileDouble "MixedBehaviorProfile<double>":
         c_Game GetGame()
         int Length()
         bool IsDefinedAt(c_GameInfoset)
+        void SetCentroid()
+        void Normalize()
         double getitem "operator[]"(int) except +IndexError
         double getaction "operator()"(c_GameAction) except +IndexError
         double GetPayoff(int)
@@ -279,14 +308,16 @@ cdef extern from "libgambit/behav.h":
         double GetRegret(c_GameAction)
         double GetLiapValue()
         c_MixedStrategyProfileDouble ToMixedProfile()
-        c_MixedBehavProfileDouble(c_MixedStrategyProfileDouble) except +NotImplementedError
-        c_MixedBehavProfileDouble(c_Game)
-        c_MixedBehavProfileDouble(c_MixedBehavProfileDouble)
+        c_MixedBehaviorProfileDouble(c_MixedStrategyProfileDouble) except +NotImplementedError
+        c_MixedBehaviorProfileDouble(c_Game)
+        c_MixedBehaviorProfileDouble(c_MixedBehaviorProfileDouble)
 
-    cdef cppclass c_MixedBehavProfileRational "MixedBehavProfile<Rational>":
+    cdef cppclass c_MixedBehaviorProfileRational "MixedBehaviorProfile<Rational>":
         c_Game GetGame()
         int Length()
         bool IsDefinedAt(c_GameInfoset)
+        void SetCentroid()
+        void Normalize()
         c_Rational getitem "operator[]"(int) except +IndexError
         c_Rational getaction "operator()"(c_GameAction) except +IndexError
         c_Rational GetPayoff(int)
@@ -298,50 +329,57 @@ cdef extern from "libgambit/behav.h":
         c_Rational GetRegret(c_GameAction)
         c_Rational GetLiapValue()
         c_MixedStrategyProfileRational ToMixedProfile()
-        c_MixedBehavProfileRational(c_MixedStrategyProfileRational) except +NotImplementedError
-        c_MixedBehavProfileRational(c_Game)
-        c_MixedBehavProfileRational(c_MixedBehavProfileRational)
+        c_MixedBehaviorProfileRational(c_MixedStrategyProfileRational) except +NotImplementedError
+        c_MixedBehaviorProfileRational(c_Game)
+        c_MixedBehaviorProfileRational(c_MixedBehaviorProfileRational)
 
 cdef extern from "libgambit/stratspt.h":
-    cdef cppclass c_StrategySupport "StrategySupport":
-        c_StrategySupport(c_Game)
-        c_StrategySupport(c_StrategySupport)
-        bool operator==(c_StrategySupport)
-        bool operator!=(c_StrategySupport)
+    cdef cppclass c_StrategySupportProfile "StrategySupportProfile":
+        c_StrategySupportProfile(c_Game)
+        c_StrategySupportProfile(c_StrategySupportProfile)
+        bool operator==(c_StrategySupportProfile)
+        bool operator!=(c_StrategySupportProfile)
         c_Game GetGame()
         Array[int] NumStrategies()        
         int MixedProfileLength()
         int GetIndex(c_GameStrategy)
         int NumStrategiesPlayer "NumStrategies"(int) except +IndexError
-        bool IsSubsetOf(c_StrategySupport)
+        bool IsSubsetOf(c_StrategySupportProfile)
         bool RemoveStrategy(c_GameStrategy)
         c_GameStrategy GetStrategy(int, int) except +IndexError
         bool Contains(c_GameStrategy)
-        c_StrategySupport Undominated(bool, bool)
+        c_StrategySupportProfile Undominated(bool, bool)
         c_MixedStrategyProfileDouble NewMixedStrategyProfileDouble "NewMixedStrategyProfile<double>"()
         c_MixedStrategyProfileRational NewMixedStrategyProfileRational "NewMixedStrategyProfile<Rational>"()
 
 cdef extern from "util.h":
     c_Game ReadGame(char *) except +IOError
+    c_Game ParseGame(char *) except +IOError
     cxx_string WriteGame(c_Game, cxx_string) except +IOError
+    cxx_string WriteGame(c_StrategySupportProfile) except +IOError
 
-    void setitem_ArrayInt(Array[int] *, int, int)
-    void setitem_MixedStrategyProfileDouble(c_MixedStrategyProfileDouble *, 
-                                            int, double)
-    void setitem_MixedStrategyProfileDoubleStrategy(c_MixedStrategyProfileDouble *, 
-                                            c_GameStrategy, double)
-    void setitem_MixedStrategyProfileRational(c_MixedStrategyProfileRational *, 
-                                            int, char *)
-    void setitem_MixedStrategyProfileRationalStrategy(c_MixedStrategyProfileRational *, 
-                                            c_GameStrategy, char *)
-    void setitem_MixedBehavProfileDouble(c_MixedBehavProfileDouble *, 
-                                            int, double)
-    void setitem_MixedBehavProfileRational(c_MixedBehavProfileRational *, 
-                                            int, char *)
-    void setaction_MixedBehavProfileDouble(c_MixedBehavProfileDouble *, 
-                                            c_GameAction, double)
-    void setaction_MixedBehavProfileRational(c_MixedBehavProfileRational *, 
-                                            c_GameAction, char *)
+    c_Rational to_rational(char *)
+    
+    void setitem_array_int "setitem"(Array[int] *, int, int)
+
+    void setitem_mspd_int "setitem"(c_MixedStrategyProfileDouble *, int, double)
+    void setitem_mspd_strategy "setitem"(c_MixedStrategyProfileDouble *,
+                                         c_GameStrategy, double)
+    void setitem_mspr_int "setitem"(c_MixedStrategyProfileRational *, int, c_Rational)
+    void setitem_mspr_strategy "setitem"(c_MixedStrategyProfileRational *,
+                                         c_GameStrategy, c_Rational)
+
+    void setitem_mbpd_int "setitem"(c_MixedBehaviorProfileDouble *, int, double)
+    void setitem_mbpd_action "setitem"(c_MixedBehaviorProfileDouble *,
+                                       c_GameAction, double)
+    void setitem_mbpr_int "setitem"(c_MixedBehaviorProfileRational *, int, c_Rational)
+    void setitem_mbpr_action "setitem"(c_MixedBehaviorProfileRational *,
+                                       c_GameAction, c_Rational)
+
+    c_MixedStrategyProfileDouble *copyitem_list_mspd "copyitem"(c_List[c_MixedStrategyProfileDouble], int)
+    c_MixedStrategyProfileRational *copyitem_list_mspr "copyitem"(c_List[c_MixedStrategyProfileRational], int)
+    c_MixedBehaviorProfileDouble *copyitem_list_mbpd "copyitem"(c_List[c_MixedBehaviorProfileDouble], int)
+    c_MixedBehaviorProfileRational *copyitem_list_mbpr "copyitem"(c_List[c_MixedBehaviorProfileRational], int)
 
 import gambit.gameiter
 
@@ -376,33 +414,4 @@ include "stratspt.pxi"
 include "mixed.pxi"
 include "behav.pxi"
 include "game.pxi"
-
-
-def new_tree():
-    cdef Game g
-    g = Game()
-    g.game = NewTree()
-    return g
-
-def new_table(dim):
-    cdef Game g
-    cdef Array[int] *d
-    d = new Array[int](len(dim))
-    for i in range(1, len(dim)+1):
-        setitem_ArrayInt(d, i, dim[i-1])
-    g = Game()
-    g.game = NewTable(d)
-    del d
-    #del_ArrayInt(d)
-    return g
-
-def read_game(char *fn):
-    cdef Game g
-    g = Game()
-    try:
-        g.game = ReadGame(fn)
-    except IOError as e:
-        raise IOError("Unable to read game from file '%s': %s" % 
-                      (fn, e))
-    return g
-        
+include "nash.pxi"

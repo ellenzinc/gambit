@@ -1,6 +1,6 @@
 #
 # This file is part of Gambit
-# Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+# Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 #
 # FILE: src/python/gambit/lib/action.pxi
 # Cython wrapper for actions
@@ -86,7 +86,7 @@ cdef class Action:
             if "." in py_string:
                 return decimal.Decimal(py_string)
             else:
-                return fractions.Fraction(py_string)
+                return Rational(py_string)
         
         def __set__(self, value):
             cdef cxx_string s

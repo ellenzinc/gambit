@@ -1,8 +1,8 @@
-An Overview of Gambit
-================================
+An overview of Gambit
+=====================
 
 What is Gambit?
---------------------
+---------------
 
 Gambit is a set of software tools for doing computation on finite,
 noncooperative games. These comprise a graphical interface for
@@ -12,7 +12,7 @@ equilibria and other solution concepts in games; and, a set of file
 formats for storing and communicating games to external tools.
 
 A brief history of Gambit
-------------------------------
+-------------------------
 
 The Gambit Project was founded in the mid-1980s by Richard McKelvey at
 the California Institute of Technology. The original implementation
@@ -47,14 +47,17 @@ goal of following good interaction design principles, especially in
 regards to easing the learning curve for users new to Gambit and new
 to game theory.  Second, the internal architecture of Gambit was
 refactored to increase interoperability between the tools provided by
-Gambit and those written independently. In particular, there are many
-more researchers active in computation in game theory today then
-during the last major Gambit development phase circa 1995, and the
-architecture of Gambit is evolving to reflect this.
+Gambit and those written independently. 
+
+Gambit is proud to have participated in the Google Summer of Code
+program in the summers of 2011 and 2012 as a mentoring organization.
+The Python API, which became part of Gambit from Gambit 13, was
+developed during these summers, thanks in particular to the work 
+of Stephen Kunath and Alessandro Andrioni.
 
 
 Key features of Gambit
----------------------------
+----------------------
 
 Gambit has a number of features useful both for the researcher and the
 instructor:
@@ -88,7 +91,7 @@ econometric analysis on games.
 
 
 Limitations of Gambit
---------------------------
+---------------------
 
 Gambit has a few limitations that may be important in some
 applications. We outline them here.
@@ -160,12 +163,18 @@ include:
 * Eugene Grayver developed the first version of the 
   graphical user interface.
 
-* Gary Wu implemented an early scripting language interface for th
-  Gambit library.
+* Gary Wu implemented an early scripting language interface for
+  Gambit (since superseded by the Python API).
 
-* Many undergraduate and graduate students at Caltech and the
-  University of Minnesota contributed in testing and documenting
-  various features.
+* Stephen Kunath and Alessandro Andrioni did extensive work to create
+  the first release of the Python API.
+
+* From Gambit 14, Gambit contains support for Action Graph Games
+  [Jiang11]_.  This has been contributed by Navin Bhat, Albert Jiang,
+  Kevin Leyton-Brown, and David Thompson, with funding support
+  provided by a University Graduate Fellowship of the University
+  of British Columbia, the NSERC Canada Graduate Scholarship, and a 
+  Google Research Award to Leyton-Brown.
 
 .. _section-downloading:
 
@@ -177,33 +186,18 @@ Gambit operates on an annual release cycle roughly mirroring the
 stable/teaching each August; the major version number is equal to the
 last two digits of the year in which the version becomes stable.
 
-This document covers Gambit 14, which is the current development/research
-version as of August 2013.  The most recent release is 14.0.0, 
-available on 13 August 2013.
+This document covers Gambit 15, which is the current development/research
+version as of October 2014.  The most recent release is 15.0.0. 
 You can download it from
 `Sourceforge
-<http://sourceforge.net/projects/gambit/files/gambit14/14.0.0>`_.
+<http://sourceforge.net/projects/gambit/files/gambit15/15.0.0>`_.
 Full source code is available, as are precompiled binaries for
 Microsoft Windows and Mac OS X 10.8.
-
-This series is where new development is made available.  It is
-intended for developers, researchers who work in algorithms in game
-theory, and those who require the latest implementations for their
-research project.  It will become the next stable/teaching version
-from August 2014.
-
-The current stable/teaching series of Gambit is
-`Gambit 13 <http://www.gambit-project.org/gambit13>`_.
-The stable version is suitable for teaching and student use, and for
-practitioners who require a version where the interface and API are
-fixed.  Further releases of Gambit 13 will be made for maintenance and
-bug fixes only.
 
 Older versions of Gambit can be downloaded from
 `http://sourceforge.net/projects/gambit/files
 <http://sourceforge.net/projects/gambit/files>`_.  Support for older
 versions is limited.
-
 
 
 Community
@@ -223,9 +217,20 @@ use and further development of Gambit:
   Discussion for those interested in devleoping or extending Gambit, 
   or using Gambit source code in other applications.
 
-Bug reports and inquiries
--------------------------
+Bug reports
+-----------
 
-Bug reports or other inquiries about Gambit should be directed to
-`Theodore Turocy <http://www.gambit-project.org/turocy>`__, 
-project director, at ted.turocy (aht) gmail (daht) com.
+In the first instance, bug reports or feature requests should be
+posted to the Gambit issue tracker, located at
+`<http://github.com/gambitproject/gambit/issues>`_.
+
+When reporting a bug, please be sure to include the following:
+
+* The version(s) of Gambit you are using.  (If possible, it is helpful
+  to know whether a bug exists in both the current stable/teaching and
+  the current development/research versions.)
+* The operating system(s) on which you encountered the bug.
+* A detailed list of steps to reproduce the bug.  Be sure to include a
+  sample game file or files if appropriate; it is often helpful to
+  simplify the game if possible.
+

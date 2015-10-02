@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/gametable.h
 // Declaration of strategic game representation
@@ -28,11 +28,15 @@
 namespace Gambit {
 
 class GameTableRep : public GameExplicitRep {
+  friend class StrategySupportProfile;
   friend class GamePlayerRep;
   friend class TablePureStrategyProfileRep;
+  friend class PureStrategyProfileRep;
+  template <class T> friend class MixedStrategyProfile;
   template <class T> friend class TableMixedStrategyProfileRep;
 private:
   Array<GameOutcomeRep *> m_results;
+  Game m_unrestricted;
 
   /// @name Private auxiliary functions
   //@{
@@ -55,6 +59,13 @@ public:
   virtual bool IsConstSum(void) const;
   virtual bool IsPerfectRecall(GameInfoset &, GameInfoset &) const
   { return true; }
+  //@}
+
+  /// @name Interface with restricted game mechanism
+  //@{
+  virtual bool IsRestriction(void) const { return (m_unrestricted != 0); }
+  virtual Game Unrestrict(void) const 
+  { if (m_unrestricted) return m_unrestricted; else throw UndefinedException(); }
   //@}
 
   /// @name Dimensions of the game
@@ -113,8 +124,8 @@ public:
   virtual PureStrategyProfile NewPureStrategyProfile(void) const;
   virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double) const;
   virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &) const; 
-  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupport&) const;
-  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupport&) const;
+  virtual MixedStrategyProfile<double> NewMixedStrategyProfile(double, const StrategySupportProfile&) const;
+  virtual MixedStrategyProfile<Rational> NewMixedStrategyProfile(const Rational &, const StrategySupportProfile&) const;
 
 };
 

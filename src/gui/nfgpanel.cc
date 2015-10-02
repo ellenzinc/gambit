@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/gui/nfgpanel.cc
 // Implementation of normal form panel
@@ -83,7 +83,7 @@ void gbtTablePlayerIcon::OnLeftClick(wxMouseEvent &)
 
 class gbtTablePlayerPanel : public wxPanel {
 private:
-  gbtNfgPanel *m_nfgPanel;
+  /* gbtNfgPanel *m_nfgPanel; */
   gbtGameDocument *m_doc;
   int m_player;
   gbtEditableText *m_playerLabel;
@@ -121,8 +121,8 @@ gbtTablePlayerPanel::gbtTablePlayerPanel(wxWindow *p_parent,
 					 gbtNfgPanel *p_nfgPanel,
 					 gbtGameDocument *p_doc,
 					 int p_player)
-  : wxPanel(p_parent, -1), 
-    m_nfgPanel(p_nfgPanel), m_doc(p_doc), m_player(p_player)
+  : wxPanel(p_parent, wxID_ANY), 
+  /* m_nfgPanel(p_nfgPanel),*/ m_doc(p_doc), m_player(p_player)
 {
   wxBoxSizer *topSizer = new wxBoxSizer(wxVERTICAL);
 

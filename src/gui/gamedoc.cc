@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/gui/gamedoc.cc
 // Implementation of game document class
@@ -30,7 +30,7 @@
 #include <wx/filename.h>       // used to create temp files for undo/redo
 
 #include "libgambit/libgambit.h"
-#include "tinyxml.h"    // for XML parser for LoadDocument()
+#include "libgambit/tinyxml.h"    // for XML parser for LoadDocument()
 
 #include "gambit.h"     // for wxGetApp()
 #include "gamedoc.h"
@@ -60,9 +60,9 @@ void gbtBehavDominanceStack::SetStrict(bool p_strict)
 void gbtBehavDominanceStack::Reset(void)
 {
   for (int i = 1; i <= m_supports.Length(); delete m_supports[i++]);
-  m_supports = Gambit::Array<Gambit::BehavSupport *>();
+  m_supports = Gambit::Array<Gambit::BehaviorSupportProfile *>();
   if (m_doc->IsTree()) {
-    m_supports.Append(new Gambit::BehavSupport(m_doc->GetGame()));
+    m_supports.Append(new Gambit::BehaviorSupportProfile(m_doc->GetGame()));
     m_current = 1;
   }
   m_noFurther = false;
@@ -85,11 +85,11 @@ bool gbtBehavDominanceStack::NextLevel(void)
   }
   
   std::ostringstream gnull;
-  Gambit::BehavSupport newSupport = 
+  Gambit::BehaviorSupportProfile newSupport = 
     m_supports[m_current]->Undominated(m_strict, true, players, gnull);
 
   if (newSupport != *m_supports[m_current]) {
-    m_supports.Append(new Gambit::BehavSupport(newSupport));
+    m_supports.Append(new Gambit::BehaviorSupportProfile(newSupport));
     m_current++;
     return true;
   }
@@ -135,8 +135,8 @@ void gbtStrategyDominanceStack::SetStrict(bool p_strict)
 void gbtStrategyDominanceStack::Reset(void)
 {
   for (int i = 1; i <= m_supports.Length(); delete m_supports[i++]);
-  m_supports = Gambit::Array<Gambit::StrategySupport *>();
-  m_supports.Append(new Gambit::StrategySupport(m_doc->GetGame()));
+  m_supports = Gambit::Array<Gambit::StrategySupportProfile *>();
+  m_supports.Append(new Gambit::StrategySupportProfile(m_doc->GetGame()));
   m_current = 1;
   m_noFurther = false;
 }
@@ -157,11 +157,11 @@ bool gbtStrategyDominanceStack::NextLevel(void)
     players.Append(pl);
   }
 
-  Gambit::StrategySupport newSupport = 
+  Gambit::StrategySupportProfile newSupport = 
     m_supports[m_current]->Undominated(m_strict, players);
 
   if (newSupport != *m_supports[m_current]) {
-    m_supports.Append(new Gambit::StrategySupport(newSupport));
+    m_supports.Append(new Gambit::StrategySupportProfile(newSupport));
     m_current++;
     return true;
   }
@@ -798,7 +798,7 @@ void gbtGameDocument::DoNewOutcome(GameNode p_node)
   UpdateViews(GBT_DOC_MODIFIED_PAYOFFS);
 }
 
-void gbtGameDocument::DoNewOutcome(PureStrategyProfile p_profile)
+void gbtGameDocument::DoNewOutcome(const PureStrategyProfile &p_profile)
 {
   p_profile->SetOutcome(m_game->NewOutcome());
   UpdateViews(GBT_DOC_MODIFIED_PAYOFFS);

@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, Litao Wei and The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, Litao Wei and The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/tools/enumpoly/nfgcpoly.h
 // Compute Nash equilibria via heuristic search on game supports
@@ -39,11 +39,11 @@ private:
   int m_stopAfter;
   double eps;
   Game NF;
-  const StrategySupport &support;
+  const StrategySupportProfile &support;
   gSpace Space;
   term_order Lex;
   int num_vars;
-  long count,nevals;
+  long nevals;
   double time;
   Gambit::List<MixedStrategyProfile<double> > solutions;
   bool is_singular;
@@ -65,7 +65,7 @@ private:
 
   int SaveSolutions(const Gambit::List<Vector<double> > &list);
 public:
-  HeuristicPolEnumModule(const StrategySupport &, int p_stopAfter);
+  HeuristicPolEnumModule(const StrategySupportProfile &, int p_stopAfter);
   
   int PolEnum(void);
   

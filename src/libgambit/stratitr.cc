@@ -1,6 +1,6 @@
 //
 // This file is part of Gambit
-// Copyright (c) 1994-2013, The Gambit Project (http://www.gambit-project.org)
+// Copyright (c) 1994-2014, The Gambit Project (http://www.gambit-project.org)
 //
 // FILE: src/libgambit/stratitr.cc
 // Implementation of normal form iterators
@@ -25,14 +25,14 @@
 namespace Gambit {
 
 //===========================================================================
-//                        class StrategyIterator
+//                        class StrategyProfileIterator
 //===========================================================================
 
 //---------------------------------------------------------------------------
 //                               Lifecycle
 //---------------------------------------------------------------------------
 
-StrategyIterator::StrategyIterator(const StrategySupport &p_support)
+StrategyProfileIterator::StrategyProfileIterator(const StrategySupportProfile &p_support)
   : m_atEnd(false), m_support(p_support),
     m_currentStrat(m_support.GetGame()->NumPlayers()),
     m_profile(m_support.GetGame()->NewPureStrategyProfile()), 
@@ -41,8 +41,8 @@ StrategyIterator::StrategyIterator(const StrategySupport &p_support)
   First();
 }
 
-StrategyIterator::StrategyIterator(const StrategySupport &p_support,
-				   int pl, int st)
+StrategyProfileIterator::StrategyProfileIterator(const StrategySupportProfile &p_support,
+						 int pl, int st)
   : m_atEnd(false), m_support(p_support), 
     m_currentStrat(m_support.GetGame()->NumPlayers()),
     m_profile(m_support.GetGame()->NewPureStrategyProfile()), 
@@ -53,8 +53,8 @@ StrategyIterator::StrategyIterator(const StrategySupport &p_support,
   First();
 }
 
-StrategyIterator::StrategyIterator(const StrategySupport &p_support,
-				   const GameStrategy &p_strategy)
+StrategyProfileIterator::StrategyProfileIterator(const StrategySupportProfile &p_support,
+						 const GameStrategy &p_strategy)
   : m_atEnd(false), m_support(p_support),
     m_currentStrat(p_support.GetGame()->NumPlayers()),
     m_profile(p_support.GetGame()->NewPureStrategyProfile()), 
@@ -67,9 +67,9 @@ StrategyIterator::StrategyIterator(const StrategySupport &p_support,
 }
 
 
-StrategyIterator::StrategyIterator(const StrategySupport &p_support,
-				   int pl1, int st1,
-				   int pl2, int st2)
+StrategyProfileIterator::StrategyProfileIterator(const StrategySupportProfile &p_support,
+						 int pl1, int st1,
+						 int pl2, int st2)
   : m_atEnd(false), m_support(p_support), 
     m_currentStrat(m_support.GetGame()->NumPlayers()),
     m_profile(m_support.GetGame()->NewPureStrategyProfile()), 
@@ -86,7 +86,7 @@ StrategyIterator::StrategyIterator(const StrategySupport &p_support,
 //                                Iteration
 //---------------------------------------------------------------------------
 
-void StrategyIterator::First(void)
+void StrategyProfileIterator::First(void)
 {
   for (int pl = 1; pl <= m_support.GetGame()->NumPlayers(); pl++) {
     if (pl == m_frozen1 || pl == m_frozen2) continue;
@@ -95,7 +95,7 @@ void StrategyIterator::First(void)
   }	
 }
 
-void StrategyIterator::operator++(void)
+void StrategyProfileIterator::operator++(void)
 {
   int pl = 1;
 
